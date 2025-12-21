@@ -1,0 +1,1858 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ponto - Registro Mensal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1a237e, #283593);
+            color: white;
+            padding: 25px;
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        h1 i {
+            color: #ff9800;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-left: 50px;
+        }
+        
+        .tabs {
+            display: flex;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .tab-button {
+            padding: 16px 30px;
+            background-color: #fff;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            text-align: center;
+            color: #555;
+        }
+        
+        .tab-button:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .tab-button.active {
+            background-color: #283593;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            background-color: white;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: #1a237e;
+            font-size: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .card-title i {
+            color: #283593;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+        
+        input:focus, select:focus {
+            border-color: #283593;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(40, 53, 147, 0.1);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background-color: #283593;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1a237e;
+        }
+        
+        .btn-success {
+            background-color: #2e7d32;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #1b5e20;
+        }
+        
+        .btn-secondary {
+            background-color: #546e7a;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #455a64;
+        }
+        
+        .btn-warning {
+            background-color: #ff9800;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #f57c00;
+        }
+        
+        .btn-danger {
+            background-color: #d32f2f;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c62828;
+        }
+        
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        
+        .btn-block {
+            width: 100%;
+        }
+        
+        .month-selector {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .month-selector select {
+            width: auto;
+            min-width: 200px;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+        }
+        
+        th {
+            background-color: #283593;
+            color: white;
+            text-align: left;
+            padding: 16px 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            border: 1px solid #ddd;
+        }
+        
+        td {
+            padding: 14px 12px;
+            border: 1px solid #eee;
+        }
+        
+        tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        .time-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        
+        .weekend {
+            background-color: #f0f4ff;
+        }
+        
+        .weekend .time-input {
+            background-color: #f8faff;
+        }
+        
+        .today {
+            background-color: #e8f5e9;
+        }
+        
+        .today .time-input {
+            background-color: #f1f8e9;
+        }
+        
+        .employee-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .employee-card {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 5px solid #283593;
+            transition: transform 0.2s;
+        }
+        
+        .employee-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .employee-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #1a237e;
+        }
+        
+        .employee-details {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .employee-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #546e7a;
+        }
+        
+        .empty-state i {
+            font-size: 50px;
+            margin-bottom: 15px;
+            color: #b0bec5;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #546e7a;
+            font-size: 14px;
+            border-top: 1px solid #eee;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background-color: #2e7d32;
+            color: white;
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.5s;
+            max-width: 400px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background-color: #d32f2f;
+        }
+        
+        .notification.warning {
+            background-color: #ff9800;
+        }
+        
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .import-export-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .total-hours {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        
+        .total-hours span {
+            color: #2e7d32;
+            font-size: 18px;
+        }
+        
+        .highlight {
+            background-color: #fff8e1 !important;
+        }
+        
+        .incomplete-day {
+            background-color: #ffebee !important;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .month-selector {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .month-selector select {
+                width: 100%;
+            }
+            
+            .employee-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions-bar {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .import-export-actions {
+                flex-direction: column;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-fingerprint"></i> Sistema de Registro de Ponto</h1>
+            <p class="subtitle">Controle mensal de horários com exportação no formato Excel</p>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab-button active" data-tab="registro">Registro de Ponto</button>
+            <button class="tab-button" data-tab="funcionarios">Cadastro de Funcionários</button>
+            <button class="tab-button" data-tab="importar">Importar/Exportar</button>
+        </div>
+        
+        <!-- TAB 1: Registro de Ponto -->
+        <div id="registro" class="tab-content active">
+            <div class="card">
+                <div class="actions-bar">
+                    <div>
+                        <h2 class="card-title"><i class="fas fa-calendar-alt"></i> Registro de Ponto Mensal</h2>
+                        <p>Preencha os horários de entrada, saída para intervalo, volta do intervalo e saída para cada dia</p>
+                    </div>
+                    
+                    <div class="form-group" style="width: 250px;">
+                        <label for="employeeSelect">Funcionário:</label>
+                        <select id="employeeSelect" class="employee-select">
+                            <option value="">Selecione um funcionário</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="month-selector">
+                    <div>
+                        <label for="monthSelect">Selecione o mês e ano:</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <select id="monthSelect">
+                                <option value="0">Janeiro</option>
+                                <option value="1">Fevereiro</option>
+                                <option value="2">Março</option>
+                                <option value="3">Abril</option>
+                                <option value="4">Maio</option>
+                                <option value="5">Junho</option>
+                                <option value="6">Julho</option>
+                                <option value="7">Agosto</option>
+                                <option value="8">Setembro</option>
+                                <option value="9">Outubro</option>
+                                <option value="10">Novembro</option>
+                                <option value="11">Dezembro</option>
+                            </select>
+                            <select id="yearSelect">
+                                <!-- Opções serão preenchidas via JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button id="generateCalendar" class="btn btn-primary">
+                            <i class="fas fa-calendar-plus"></i> Gerar Calendário
+                        </button>
+                        <button id="autoFill" class="btn btn-secondary">
+                            <i class="fas fa-magic"></i> Preencher Automático
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table id="timesheetTable">
+                        <thead>
+                            <tr>
+                                <th width="60">Dia</th>
+                                <th width="120">Dia da Semana</th>
+                                <th width="150">Entrada</th>
+                                <th width="180">Saída (Intervalo)</th>
+                                <th width="180">Volta (Intervalo)</th>
+                                <th width="150">Saída</th>
+                                <th width="120">Total Diário</th>
+                                <th width="100">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timesheetBody">
+                            <!-- Conteúdo gerado via JavaScript -->
+                            <tr>
+                                <td colspan="8" class="empty-state">
+                                    <i class="fas fa-calendar-day"></i>
+                                    <p>Selecione um funcionário, mês e ano, depois clique em "Gerar Calendário" para começar</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="total-hours">
+                    <div>Total de horas no mês:</div>
+                    <div><span id="totalMonthHours">00:00</span> horas</div>
+                </div>
+                
+                <div style="margin-top: 25px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button id="clearMonth" class="btn btn-secondary">
+                            <i class="fas fa-eraser"></i> Limpar Mês
+                        </button>
+                        <button id="saveMonth" class="btn btn-success">
+                            <i class="fas fa-save"></i> Salvar Registros
+                        </button>
+                    </div>
+                    
+                    <button id="exportCurrent" class="btn btn-primary">
+                        <i class="fas fa-file-excel"></i> Exportar para Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB 2: Cadastro de Funcionários -->
+        <div id="funcionarios" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-users"></i> Cadastro de Funcionários</h2>
+                
+                <form id="employeeForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employeeName">Nome completo *</label>
+                            <input type="text" id="employeeName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="employeeId">Matrícula/ID *</label>
+                            <input type="text" id="employeeId" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employeeDepartment">Departamento/Cargo</label>
+                            <input type="text" id="employeeDepartment">
+                        </div>
+                        <div class="form-group">
+                            <label for="employeeEmail">E-mail</label>
+                            <input type="email" id="employeeEmail">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employeeAdmission">Data de Admissão</label>
+                            <input type="date" id="employeeAdmission">
+                        </div>
+                        <div class="form-group">
+                            <label for="employeeStatus">Status</label>
+                            <select id="employeeStatus">
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="ferias">Férias</option>
+                                <option value="afastado">Afastado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="workdayStart">Horário padrão de entrada</label>
+                            <input type="time" id="workdayStart" value="08:00">
+                        </div>
+                        <div class="form-group">
+                            <label for="workdayEnd">Horário padrão de saída</label>
+                            <input type="time" id="workdayEnd" value="17:00">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-user-plus"></i> Cadastrar Funcionário
+                    </button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-list"></i> Funcionários Cadastrados</h2>
+                <div id="employeesList" class="employee-list">
+                    <!-- Lista de funcionários será gerada via JavaScript -->
+                    <div class="empty-state">
+                        <i class="fas fa-user-friends"></i>
+                        <p>Nenhum funcionário cadastrado ainda. Use o formulário acima para adicionar.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB 3: Importar/Exportar -->
+        <div id="importar" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-file-import"></i> Importar Dados</h2>
+                <p>Importe dados de um arquivo Excel no formato correto</p>
+                
+                <div class="form-group">
+                    <label for="importEmployee">Funcionário para importação:</label>
+                    <select id="importEmployee">
+                        <option value="">Selecione um funcionário</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="importFile">Arquivo Excel (.xlsx):</label>
+                    <input type="file" id="importFile" accept=".xlsx, .xls">
+                    <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                        <i class="fas fa-info-circle"></i> O arquivo deve ter o formato: Coluna A = Dia, B = Entrada, C = Saída (Intervalo), D = Volta (Intervalo), E = Saída
+                    </p>
+                </div>
+                
+                <button id="importExcel" class="btn btn-success">
+                    <i class="fas fa-file-import"></i> Importar do Excel
+                </button>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <h3 class="card-title" style="font-size: 18px;"><i class="fas fa-database"></i> Backup dos Dados</h3>
+                    <p>Faça backup de todos os dados do sistema (funcionários e registros de ponto)</p>
+                    
+                    <div class="import-export-actions">
+                        <button id="exportBackup" class="btn btn-primary">
+                            <i class="fas fa-download"></i> Fazer Backup
+                        </button>
+                        <button id="importBackup" class="btn btn-secondary">
+                            <i class="fas fa-upload"></i> Restaurar Backup
+                        </button>
+                        <button id="clearAllData" class="btn btn-danger">
+                            <i class="fas fa-trash-alt"></i> Limpar Todos os Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-file-export"></i> Exportar Dados</h2>
+                <p>Exporte os registros de ponto para Excel no formato padrão</p>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="exportEmployee">Funcionário:</label>
+                        <select id="exportEmployee">
+                            <option value="all">Todos os funcionários</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="exportMonth">Mês:</label>
+                        <select id="exportMonth">
+                            <option value="all">Todos os meses</option>
+                            <option value="0">Janeiro</option>
+                            <option value="1">Fevereiro</option>
+                            <option value="2">Março</option>
+                            <option value="3">Abril</option>
+                            <option value="4">Maio</option>
+                            <option value="5">Junho</option>
+                            <option value="6">Julho</option>
+                            <option value="7">Agosto</option>
+                            <option value="8">Setembro</option>
+                            <option value="9">Outubro</option>
+                            <option value="10">Novembro</option>
+                            <option value="11">Dezembro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="exportYear">Ano:</label>
+                        <select id="exportYear">
+                            <option value="all">Todos os anos</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="import-export-actions">
+                    <button id="exportExcel" class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> Exportar para Excel
+                    </button>
+                    <button id="exportPDF" class="btn btn-warning">
+                        <i class="fas fa-file-pdf"></i> Exportar para PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Sistema de Registro de Ponto - Para uso local | Dados armazenados no navegador</p>
+            <p>© 2023 - Formato de exportação compatível com Excel</p>
+        </div>
+        
+        <div id="notification" class="notification">
+            <i class="fas fa-check-circle"></i>
+            <span id="notificationText">Operação realizada com sucesso!</span>
+        </div>
+    </div>
+
+    <script>
+        // Variáveis globais
+        let employees = [];
+        let timesheets = {};
+        let currentEmployeeId = '';
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            // Carregar dados do localStorage
+            loadData();
+            
+            // Configurar anos nos selects
+            setupYearSelects();
+            
+            // Configurar mês atual
+            document.getElementById('monthSelect').value = currentMonth;
+            document.getElementById('yearSelect').value = currentYear;
+            
+            // Configurar eventos dos tabs
+            setupTabs();
+            
+            // Configurar eventos dos formulários
+            setupEventListeners();
+            
+            // Atualizar lista de funcionários
+            updateEmployeeSelects();
+            renderEmployeesList();
+            
+            // Gerar calendário do mês atual
+            generateCalendar();
+        });
+        
+        // Configurar tabs
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.getAttribute('data-tab');
+                    
+                    // Remover classe active de todos os botões e conteúdos
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Adicionar classe active ao botão clicado e conteúdo correspondente
+                    button.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        }
+        
+        // Configurar selects de ano
+        function setupYearSelects() {
+            const yearSelect = document.getElementById('yearSelect');
+            const exportYearSelect = document.getElementById('exportYear');
+            const currentYear = new Date().getFullYear();
+            
+            // Adicionar anos de 2020 a 2030
+            for (let year = 2020; year <= 2030; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+                
+                const exportOption = option.cloneNode(true);
+                exportYearSelect.appendChild(exportOption);
+            }
+            
+            // Selecionar ano atual
+            yearSelect.value = currentYear;
+        }
+        
+        // Configurar eventos
+        function setupEventListeners() {
+            // Gerar calendário
+            document.getElementById('generateCalendar').addEventListener('click', generateCalendar);
+            
+            // Preenchimento automático
+            document.getElementById('autoFill').addEventListener('click', autoFillTimesheet);
+            
+            // Salvar registros do mês
+            document.getElementById('saveMonth').addEventListener('click', saveTimesheet);
+            
+            // Limpar registros do mês
+            document.getElementById('clearMonth').addEventListener('click', clearTimesheet);
+            
+            // Exportar registro atual
+            document.getElementById('exportCurrent').addEventListener('click', exportCurrentTimesheet);
+            
+            // Cadastrar funcionário
+            document.getElementById('employeeForm').addEventListener('submit', addEmployee);
+            
+            // Importar do Excel
+            document.getElementById('importExcel').addEventListener('click', importFromExcel);
+            
+            // Exportar para Excel
+            document.getElementById('exportExcel').addEventListener('click', exportToExcel);
+            
+            // Backup e restauração
+            document.getElementById('exportBackup').addEventListener('click', exportBackup);
+            document.getElementById('importBackup').addEventListener('click', importBackup);
+            
+            // Gerenciamento de dados
+            document.getElementById('clearAllData').addEventListener('click', clearAllData);
+            
+            // Mudança de funcionário
+            document.getElementById('employeeSelect').addEventListener('change', function() {
+                currentEmployeeId = this.value;
+                if (currentEmployeeId) {
+                    generateCalendar();
+                }
+            });
+        }
+        
+        // Carregar dados do localStorage
+        function loadData() {
+            const savedEmployees = localStorage.getItem('pointRegisterEmployees');
+            const savedTimesheets = localStorage.getItem('pointRegisterTimesheets');
+            
+            if (savedEmployees) {
+                employees = JSON.parse(savedEmployees);
+            }
+            
+            if (savedTimesheets) {
+                timesheets = JSON.parse(savedTimesheets);
+            }
+        }
+        
+        // Salvar dados no localStorage
+        function saveData() {
+            localStorage.setItem('pointRegisterEmployees', JSON.stringify(employees));
+            localStorage.setItem('pointRegisterTimesheets', JSON.stringify(timesheets));
+        }
+        
+        // Atualizar selects de funcionários
+        function updateEmployeeSelects() {
+            const employeeSelect = document.getElementById('employeeSelect');
+            const exportEmployeeSelect = document.getElementById('exportEmployee');
+            const importEmployeeSelect = document.getElementById('importEmployee');
+            
+            // Limpar opções exceto a primeira
+            while (employeeSelect.options.length > 1) {
+                employeeSelect.remove(1);
+            }
+            
+            while (exportEmployeeSelect.options.length > 1) {
+                exportEmployeeSelect.remove(1);
+            }
+            
+            while (importEmployeeSelect.options.length > 1) {
+                importEmployeeSelect.remove(1);
+            }
+            
+            // Adicionar funcionários
+            employees.forEach(employee => {
+                if (employee.status === 'ativo') {
+                    const option = document.createElement('option');
+                    option.value = employee.id;
+                    option.textContent = `${employee.name} (${employee.id})`;
+                    employeeSelect.appendChild(option);
+                    
+                    const exportOption = option.cloneNode(true);
+                    exportEmployeeSelect.appendChild(exportOption);
+                    
+                    const importOption = option.cloneNode(true);
+                    importEmployeeSelect.appendChild(importOption);
+                }
+            });
+            
+            // Selecionar primeiro funcionário ativo, se disponível
+            const firstActiveEmployee = employees.find(emp => emp.status === 'ativo');
+            if (firstActiveEmployee && !currentEmployeeId) {
+                currentEmployeeId = firstActiveEmployee.id;
+                employeeSelect.value = currentEmployeeId;
+            }
+        }
+        
+        // Renderizar lista de funcionários
+        function renderEmployeesList() {
+            const employeesList = document.getElementById('employeesList');
+            
+            if (employees.length === 0) {
+                employeesList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-user-friends"></i>
+                        <p>Nenhum funcionário cadastrado ainda. Use o formulário acima para adicionar.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            employeesList.innerHTML = '';
+            
+            employees.forEach(employee => {
+                const employeeCard = document.createElement('div');
+                employeeCard.className = 'employee-card';
+                
+                const statusColors = {
+                    'ativo': '#2e7d32',
+                    'inativo': '#d32f2f',
+                    'ferias': '#ff9800',
+                    'afastado': '#9c27b0'
+                };
+                
+                employeeCard.style.borderLeftColor = statusColors[employee.status] || '#283593';
+                
+                employeeCard.innerHTML = `
+                    <div class="employee-name">${employee.name}</div>
+                    <div class="employee-details">
+                        <div><strong>Matrícula:</strong> ${employee.id}</div>
+                        <div><strong>Cargo:</strong> ${employee.department || 'Não informado'}</div>
+                        <div><strong>Admissão:</strong> ${employee.admission ? formatDate(employee.admission) : 'Não informada'}</div>
+                        <div><strong>Horário:</strong> ${employee.workdayStart || '08:00'} - ${employee.workdayEnd || '17:00'}</div>
+                        <div><strong>Status:</strong> <span style="color: ${statusColors[employee.status] || '#333'}">${getStatusText(employee.status)}</span></div>
+                    </div>
+                    <div class="employee-actions">
+                        <button class="btn btn-sm btn-secondary edit-employee" data-id="${employee.id}">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-sm ${employee.status === 'ativo' ? 'btn-danger' : 'btn-success'} toggle-status" data-id="${employee.id}">
+                            <i class="fas fa-user${employee.status === 'ativo' ? '-slash' : '-check'}"></i> ${employee.status === 'ativo' ? 'Desativar' : 'Ativar'}
+                        </button>
+                    </div>
+                `;
+                
+                employeesList.appendChild(employeeCard);
+            });
+            
+            // Adicionar eventos aos botões
+            document.querySelectorAll('.edit-employee').forEach(button => {
+                button.addEventListener('click', function() {
+                    editEmployee(this.getAttribute('data-id'));
+                });
+            });
+            
+            document.querySelectorAll('.toggle-status').forEach(button => {
+                button.addEventListener('click', function() {
+                    toggleEmployeeStatus(this.getAttribute('data-id'));
+                });
+            });
+        }
+        
+        // Obter texto do status
+        function getStatusText(status) {
+            const statusMap = {
+                'ativo': 'Ativo',
+                'inativo': 'Inativo',
+                'ferias': 'Férias',
+                'afastado': 'Afastado'
+            };
+            return statusMap[status] || status;
+        }
+        
+        // Adicionar funcionário
+        function addEmployee(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('employeeName').value;
+            const id = document.getElementById('employeeId').value;
+            const department = document.getElementById('employeeDepartment').value;
+            const email = document.getElementById('employeeEmail').value;
+            const admission = document.getElementById('employeeAdmission').value;
+            const status = document.getElementById('employeeStatus').value;
+            const workdayStart = document.getElementById('workdayStart').value;
+            const workdayEnd = document.getElementById('workdayEnd').value;
+            
+            // Verificar se matrícula já existe
+            if (employees.some(emp => emp.id === id)) {
+                showNotification('Matrícula já cadastrada! Use uma matrícula diferente.', 'error');
+                return;
+            }
+            
+            const employee = {
+                name,
+                id,
+                department,
+                email,
+                admission,
+                status,
+                workdayStart,
+                workdayEnd
+            };
+            
+            employees.push(employee);
+            saveData();
+            updateEmployeeSelects();
+            renderEmployeesList();
+            
+            // Limpar formulário
+            document.getElementById('employeeForm').reset();
+            document.getElementById('workdayStart').value = '08:00';
+            document.getElementById('workdayEnd').value = '17:00';
+            
+            showNotification('Funcionário cadastrado com sucesso!');
+        }
+        
+        // Editar funcionário
+        function editEmployee(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) return;
+            
+            // Preencher formulário com dados do funcionário
+            document.getElementById('employeeName').value = employee.name;
+            document.getElementById('employeeId').value = employee.id;
+            document.getElementById('employeeDepartment').value = employee.department;
+            document.getElementById('employeeEmail').value = employee.email;
+            document.getElementById('employeeAdmission').value = employee.admission;
+            document.getElementById('employeeStatus').value = employee.status;
+            document.getElementById('workdayStart').value = employee.workdayStart || '08:00';
+            document.getElementById('workdayEnd').value = employee.workdayEnd || '17:00';
+            
+            // Remover funcionário da lista para atualização
+            employees = employees.filter(emp => emp.id !== employeeId);
+            
+            // Atualizar selects e lista
+            updateEmployeeSelects();
+            renderEmployeesList();
+            
+            showNotification('Funcionário carregado para edição. Atualize os dados e clique em Cadastrar.', 'warning');
+            
+            // Mudar para a aba de funcionários
+            document.querySelector('[data-tab="funcionarios"]').click();
+        }
+        
+        // Alternar status do funcionário
+        function toggleEmployeeStatus(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) return;
+            
+            employee.status = employee.status === 'ativo' ? 'inativo' : 'ativo';
+            saveData();
+            updateEmployeeSelects();
+            renderEmployeesList();
+            
+            showNotification(`Funcionário ${employee.status === 'ativo' ? 'ativado' : 'desativado'} com sucesso!`);
+        }
+        
+        // Gerar calendário
+        function generateCalendar() {
+            if (!currentEmployeeId) {
+                showNotification('Selecione um funcionário primeiro!', 'error');
+                return;
+            }
+            
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const today = new Date();
+            
+            // Verificar se há dados salvos para este mês/funcionário
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            const savedData = timesheets[timesheetKey];
+            
+            // Obter dias do mês
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = new Date(year, month, 1).getDay();
+            
+            const timesheetBody = document.getElementById('timesheetBody');
+            timesheetBody.innerHTML = '';
+            
+            // Preencher dias do mês
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(year, month, day);
+                const dayOfWeek = currentDate.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const isToday = today.getDate() === day && 
+                               today.getMonth() === month && 
+                               today.getFullYear() === year;
+                const dayName = getDayName(dayOfWeek);
+                
+                // Verificar se há dados salvos para este dia
+                const dayData = savedData && savedData[day] ? savedData[day] : {
+                    entrada: '',
+                    saidaIntervalo: '',
+                    voltaIntervalo: '',
+                    saida: ''
+                };
+                
+                // Calcular total diário se todos os campos estiverem preenchidos
+                let totalDiario = '';
+                let status = '';
+                let rowClass = '';
+                
+                if (dayData.entrada && dayData.saida) {
+                    totalDiario = calculateDailyTotal(dayData);
+                    status = '<span style="color: #2e7d32">Completo</span>';
+                } else if (dayData.entrada || dayData.saidaIntervalo || dayData.voltaIntervalo || dayData.saida) {
+                    status = '<span style="color: #ff9800">Parcial</span>';
+                    rowClass = 'incomplete-day';
+                } else {
+                    status = '<span style="color: #9e9e9e">Não preenchido</span>';
+                }
+                
+                if (isWeekend) rowClass += ' weekend';
+                if (isToday) rowClass += ' today';
+                
+                const row = document.createElement('tr');
+                if (rowClass) row.className = rowClass;
+                
+                row.innerHTML = `
+                    <td>${day}</td>
+                    <td>${dayName}</td>
+                    <td><input type="time" class="time-input entrada" data-day="${day}" value="${dayData.entrada}"></td>
+                    <td><input type="time" class="time-input saida-intervalo" data-day="${day}" value="${dayData.saidaIntervalo}"></td>
+                    <td><input type="time" class="time-input volta-intervalo" data-day="${day}" value="${dayData.voltaIntervalo}"></td>
+                    <td><input type="time" class="time-input saida" data-day="${day}" value="${dayData.saida}"></td>
+                    <td>${totalDiario}</td>
+                    <td>${status}</td>
+                `;
+                
+                timesheetBody.appendChild(row);
+            }
+            
+            // Adicionar evento de cálculo automático
+            document.querySelectorAll('.time-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    calculateDailyTotalForRow(this.closest('tr'));
+                    calculateMonthTotal();
+                });
+            });
+            
+            calculateMonthTotal();
+        }
+        
+        // Obter nome do dia da semana
+        function getDayName(dayIndex) {
+            const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            return days[dayIndex];
+        }
+        
+        // Calcular total diário para uma linha
+        function calculateDailyTotalForRow(row) {
+            const day = row.querySelector('.entrada').getAttribute('data-day');
+            const entrada = row.querySelector('.entrada').value;
+            const saidaIntervalo = row.querySelector('.saida-intervalo').value;
+            const voltaIntervalo = row.querySelector('.volta-intervalo').value;
+            const saida = row.querySelector('.saida').value;
+            
+            let totalDiario = '';
+            let status = row.querySelector('td:last-child');
+            
+            // Atualizar status
+            if (entrada && saida) {
+                status.innerHTML = '<span style="color: #2e7d32">Completo</span>';
+                row.classList.remove('incomplete-day');
+            } else if (entrada || saidaIntervalo || voltaIntervalo || saida) {
+                status.innerHTML = '<span style="color: #ff9800">Parcial</span>';
+                row.classList.add('incomplete-day');
+            } else {
+                status.innerHTML = '<span style="color: #9e9e9e">Não preenchido</span>';
+                row.classList.remove('incomplete-day');
+            }
+            
+            // Calcular total se entrada e saída estiverem preenchidos
+            if (entrada && saida) {
+                const entradaTime = timeToMinutes(entrada);
+                const saidaTime = timeToMinutes(saida);
+                
+                let totalMinutes = saidaTime - entradaTime;
+                
+                // Subtrair intervalo se informado
+                if (saidaIntervalo && voltaIntervalo) {
+                    const saidaIntervaloTime = timeToMinutes(saidaIntervalo);
+                    const voltaIntervaloTime = timeToMinutes(voltaIntervalo);
+                    totalMinutes -= (voltaIntervaloTime - saidaIntervaloTime);
+                }
+                
+                if (totalMinutes > 0) {
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+                    totalDiario = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                } else {
+                    totalDiario = '00:00';
+                }
+            }
+            
+            row.querySelector('td:nth-child(7)').textContent = totalDiario;
+        }
+        
+        // Calcular total do mês
+        function calculateMonthTotal() {
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            let totalMinutes = 0;
+            
+            rows.forEach(row => {
+                const totalCell = row.querySelector('td:nth-child(7)').textContent;
+                if (totalCell && totalCell !== '') {
+                    const [hours, minutes] = totalCell.split(':').map(Number);
+                    totalMinutes += hours * 60 + minutes;
+                }
+            });
+            
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const totalFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            
+            document.getElementById('totalMonthHours').textContent = totalFormatted;
+        }
+        
+        // Calcular total diário a partir dos dados
+        function calculateDailyTotal(dayData) {
+            const entradaTime = timeToMinutes(dayData.entrada);
+            const saidaTime = timeToMinutes(dayData.saida);
+            
+            let totalMinutes = saidaTime - entradaTime;
+            
+            // Subtrair intervalo se informado
+            if (dayData.saidaIntervalo && dayData.voltaIntervalo) {
+                const saidaIntervaloTime = timeToMinutes(dayData.saidaIntervalo);
+                const voltaIntervaloTime = timeToMinutes(dayData.voltaIntervalo);
+                totalMinutes -= (voltaIntervaloTime - saidaIntervaloTime);
+            }
+            
+            if (totalMinutes <= 0) return '00:00';
+            
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+        
+        // Converter tempo HH:MM para minutos
+        function timeToMinutes(time) {
+            if (!time) return 0;
+            const [hours, minutes] = time.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+        
+        // Preenchimento automático
+        function autoFillTimesheet() {
+            if (!currentEmployeeId) {
+                showNotification('Selecione um funcionário primeiro!', 'error');
+                return;
+            }
+            
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            if (!employee) return;
+            
+            const workdayStart = employee.workdayStart || '08:00';
+            const workdayEnd = employee.workdayEnd || '17:00';
+            const lunchStart = '12:00';
+            const lunchEnd = '13:00';
+            
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            rows.forEach(row => {
+                const dayOfWeek = row.querySelector('td:nth-child(2)').textContent;
+                
+                // Não preencher finais de semana
+                if (dayOfWeek === 'Dom' || dayOfWeek === 'Sáb') return;
+                
+                // Preencher horários padrão
+                row.querySelector('.entrada').value = workdayStart;
+                row.querySelector('.saida-intervalo').value = lunchStart;
+                row.querySelector('.volta-intervalo').value = lunchEnd;
+                row.querySelector('.saida').value = workdayEnd;
+                
+                // Calcular total para esta linha
+                calculateDailyTotalForRow(row);
+            });
+            
+            calculateMonthTotal();
+            showNotification('Horários preenchidos automaticamente!');
+        }
+        
+        // Salvar registros do mês
+        function saveTimesheet() {
+            if (!currentEmployeeId) {
+                showNotification('Selecione um funcionário primeiro!', 'error');
+                return;
+            }
+            
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            
+            // Coletar dados da tabela
+            const daysData = {};
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            
+            rows.forEach(row => {
+                const day = row.querySelector('.entrada').getAttribute('data-day');
+                
+                daysData[day] = {
+                    entrada: row.querySelector('.entrada').value,
+                    saidaIntervalo: row.querySelector('.saida-intervalo').value,
+                    voltaIntervalo: row.querySelector('.volta-intervalo').value,
+                    saida: row.querySelector('.saida').value
+                };
+            });
+            
+            // Salvar no objeto timesheets
+            timesheets[timesheetKey] = daysData;
+            saveData();
+            
+            showNotification('Registros do mês salvos com sucesso!');
+        }
+        
+        // Limpar registros do mês
+        function clearTimesheet() {
+            if (!confirm('Tem certeza que deseja limpar todos os registros deste mês?')) {
+                return;
+            }
+            
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            
+            // Remover do objeto timesheets
+            delete timesheets[timesheetKey];
+            saveData();
+            
+            // Regenerar calendário vazio
+            generateCalendar();
+            
+            showNotification('Registros do mês limpos com sucesso!');
+        }
+        
+        // Exportar registro atual para Excel (formato exato do modelo)
+        function exportCurrentTimesheet() {
+            if (!currentEmployeeId) {
+                showNotification('Selecione um funcionário primeiro!', 'error');
+                return;
+            }
+            
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            const savedData = timesheets[timesheetKey];
+            
+            if (!savedData) {
+                showNotification('Não há dados salvos para este mês!', 'warning');
+                return;
+            }
+            
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            const monthName = getMonthName(month);
+            
+            // Criar dados no formato exato do modelo
+            const data = [];
+            
+            // Cabeçalho
+            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída"]);
+            
+            // Obter dias do mês
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            // Preencher dados
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayData = savedData[day] || {
+                    entrada: '',
+                    saidaIntervalo: '',
+                    voltaIntervalo: '',
+                    saida: ''
+                };
+                
+                // Formatar para HH:MM:SS (como no modelo)
+                const formatTime = (time) => {
+                    if (!time) return '';
+                    // Se já tiver segundos, manter, senão adicionar :00
+                    return time.length === 5 ? time + ':00' : time;
+                };
+                
+                data.push([
+                    day,
+                    formatTime(dayData.entrada),
+                    formatTime(dayData.saidaIntervalo),
+                    formatTime(dayData.voltaIntervalo),
+                    formatTime(dayData.saida)
+                ]);
+            }
+            
+            // Criar workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Converter dados para worksheet
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            
+            // Ajustar largura das colunas
+            const wscols = [
+                {wch: 5},   // Dia
+                {wch: 10},  // Entrada
+                {wch: 15},  // Saída (Intervalo)
+                {wch: 15},  // Volta (Intervalo)
+                {wch: 10}   // Saída
+            ];
+            ws['!cols'] = wscols;
+            
+            // Adicionar worksheet ao workbook
+            XLSX.utils.book_append_sheet(wb, ws, "Plan1");
+            
+            // Criar worksheets vazios para Plan2 e Plan3 (como no modelo)
+            const ws2 = XLSX.utils.aoa_to_sheet([]);
+            XLSX.utils.book_append_sheet(wb, ws2, "Plan2");
+            
+            const ws3 = XLSX.utils.aoa_to_sheet([]);
+            XLSX.utils.book_append_sheet(wb, ws3, "Plan3");
+            
+            // Gerar nome do arquivo
+            const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
+            
+            // Salvar arquivo
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification('Arquivo Excel exportado no formato correto!');
+        }
+        
+        // Exportar para Excel (todos os dados)
+        function exportToExcel() {
+            const employeeId = document.getElementById('exportEmployee').value;
+            const month = document.getElementById('exportMonth').value;
+            const year = document.getElementById('exportYear').value;
+            
+            // Criar workbook
+            const wb = XLSX.utils.book_new();
+            
+            if (employeeId === 'all') {
+                // Exportar todos os funcionários
+                employees.forEach(employee => {
+                    Object.keys(timesheets).forEach(key => {
+                        if (key.startsWith(employee.id)) {
+                            const [empId, sheetYear, sheetMonth] = key.split('-');
+                            
+                            // Filtrar por mês e ano se selecionados
+                            if ((month === 'all' || sheetMonth === month) && 
+                                (year === 'all' || sheetYear === year)) {
+                                
+                                const monthName = getMonthName(parseInt(sheetMonth));
+                                const daysData = timesheets[key];
+                                
+                                // Criar dados no formato do modelo
+                                const data = [];
+                                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída"]);
+                                
+                                // Obter dias do mês
+                                const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
+                                
+                                for (let day = 1; day <= daysInMonth; day++) {
+                                    const dayData = daysData[day] || {
+                                        entrada: '',
+                                        saidaIntervalo: '',
+                                        voltaIntervalo: '',
+                                        saida: ''
+                                    };
+                                    
+                                    // Formatar para HH:MM:SS
+                                    const formatTime = (time) => {
+                                        if (!time) return '';
+                                        return time.length === 5 ? time + ':00' : time;
+                                    };
+                                    
+                                    data.push([
+                                        day,
+                                        formatTime(dayData.entrada),
+                                        formatTime(dayData.saidaIntervalo),
+                                        formatTime(dayData.voltaIntervalo),
+                                        formatTime(dayData.saida)
+                                    ]);
+                                }
+                                
+                                // Criar worksheet
+                                const ws = XLSX.utils.aoa_to_sheet(data);
+                                
+                                // Ajustar largura das colunas
+                                const wscols = [
+                                    {wch: 5},
+                                    {wch: 10},
+                                    {wch: 15},
+                                    {wch: 15},
+                                    {wch: 10}
+                                ];
+                                ws['!cols'] = wscols;
+                                
+                                // Adicionar ao workbook
+                                const sheetName = `${employee.name.substring(0, 20)}_${monthName}_${sheetYear}`.substring(0, 31);
+                                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                            }
+                        }
+                    });
+                });
+            } else {
+                // Exportar apenas um funcionário
+                Object.keys(timesheets).forEach(key => {
+                    if (key.startsWith(employeeId)) {
+                        const [empId, sheetYear, sheetMonth] = key.split('-');
+                        
+                        // Filtrar por mês e ano se selecionados
+                        if ((month === 'all' || sheetMonth === month) && 
+                            (year === 'all' || sheetYear === year)) {
+                            
+                            const employee = employees.find(emp => emp.id === empId);
+                            const monthName = getMonthName(parseInt(sheetMonth));
+                            const daysData = timesheets[key];
+                            
+                            // Criar dados no formato do modelo
+                            const data = [];
+                            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída"]);
+                            
+                            // Obter dias do mês
+                            const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
+                            
+                            for (let day = 1; day <= daysInMonth; day++) {
+                                const dayData = daysData[day] || {
+                                    entrada: '',
+                                    saidaIntervalo: '',
+                                    voltaIntervalo: '',
+                                    saida: ''
+                                };
+                                
+                                // Formatar para HH:MM:SS
+                                const formatTime = (time) => {
+                                    if (!time) return '';
+                                    return time.length === 5 ? time + ':00' : time;
+                                };
+                                
+                                data.push([
+                                    day,
+                                    formatTime(dayData.entrada),
+                                    formatTime(dayData.saidaIntervalo),
+                                    formatTime(dayData.voltaIntervalo),
+                                    formatTime(dayData.saida)
+                                ]);
+                            }
+                            
+                            // Criar worksheet
+                            const ws = XLSX.utils.aoa_to_sheet(data);
+                            
+                            // Ajustar largura das colunas
+                            const wscols = [
+                                {wch: 5},
+                                {wch: 10},
+                                {wch: 15},
+                                {wch: 15},
+                                {wch: 10}
+                            ];
+                            ws['!cols'] = wscols;
+                            
+                            // Adicionar ao workbook
+                            const sheetName = `${monthName}_${sheetYear}`;
+                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        }
+                    }
+                });
+            }
+            
+            // Verificar se há dados para exportar
+            if (wb.SheetNames.length === 0) {
+                showNotification('Nenhum dado encontrado para exportar!', 'warning');
+                return;
+            }
+            
+            // Gerar nome do arquivo
+            const fileName = `Registro_Ponto_${new Date().toISOString().split('T')[0]}.xlsx`;
+            
+            // Salvar arquivo
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification('Dados exportados com sucesso!');
+        }
+        
+        // Importar do Excel
+        function importFromExcel() {
+            const employeeId = document.getElementById('importEmployee').value;
+            const fileInput = document.getElementById('importFile');
+            
+            if (!employeeId) {
+                showNotification('Selecione um funcionário para importação!', 'error');
+                return;
+            }
+            
+            if (!fileInput.files.length) {
+                showNotification('Selecione um arquivo Excel para importar!', 'error');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    // Obter a primeira planilha
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Converter para JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                    
+                    // Verificar formato (deve ter pelo menos cabeçalho)
+                    if (jsonData.length < 2) {
+                        throw new Error('Arquivo sem dados');
+                    }
+                    
+                    // Extrair mês e ano do nome do arquivo ou pedir para o usuário
+                    const month = parseInt(prompt("Digite o número do mês (1-12):", new Date().getMonth() + 1)) - 1;
+                    const year = parseInt(prompt("Digite o ano:", new Date().getFullYear()));
+                    
+                    if (isNaN(month) || month < 0 || month > 11 || isNaN(year)) {
+                        throw new Error('Mês ou ano inválido');
+                    }
+                    
+                    const timesheetKey = `${employeeId}-${year}-${month}`;
+                    const daysData = {};
+                    
+                    // Processar linhas (ignorar cabeçalho)
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row.length >= 5) {
+                            const day = parseInt(row[0]);
+                            
+                            // Converter formatos de tempo
+                            const formatTimeFromExcel = (excelTime) => {
+                                if (!excelTime) return '';
+                                
+                                // Se for um número (formato Excel), converter
+                                if (typeof excelTime === 'number') {
+                                    // Converter fração de dia para horas
+                                    const totalSeconds = Math.floor(excelTime * 24 * 60 * 60);
+                                    const hours = Math.floor(totalSeconds / 3600);
+                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                                }
+                                
+                                // Se for string, remover segundos se existirem
+                                const timeStr = String(excelTime);
+                                if (timeStr.includes(':')) {
+                                    const parts = timeStr.split(':');
+                                    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+                                }
+                                
+                                return '';
+                            };
+                            
+                            daysData[day] = {
+                                entrada: formatTimeFromExcel(row[1]),
+                                saidaIntervalo: formatTimeFromExcel(row[2]),
+                                voltaIntervalo: formatTimeFromExcel(row[3]),
+                                saida: formatTimeFromExcel(row[4])
+                            };
+                        }
+                    }
+                    
+                    // Salvar dados
+                    timesheets[timesheetKey] = daysData;
+                    saveData();
+                    
+                    showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
+                    
+                    // Limpar campo de arquivo
+                    fileInput.value = '';
+                    
+                    // Se for o funcionário atual, atualizar a tabela
+                    if (employeeId === currentEmployeeId && 
+                        month === parseInt(document.getElementById('monthSelect').value) &&
+                        year === parseInt(document.getElementById('yearSelect').value)) {
+                        generateCalendar();
+                    }
+                    
+                } catch (error) {
+                    showNotification('Erro ao importar arquivo: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Obter nome do mês
+        function getMonthName(monthIndex) {
+            const months = [
+                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ];
+            return months[monthIndex];
+        }
+        
+        // Fazer backup dos dados
+        function exportBackup() {
+            const backupData = {
+                employees,
+                timesheets,
+                exportDate: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `backup_ponto_${new Date().toISOString().split('T')[0]}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showNotification('Backup exportado com sucesso!');
+        }
+        
+        // Restaurar backup
+        function importBackup() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const backupData = JSON.parse(e.target.result);
+                        
+                        if (!backupData.employees || !backupData.timesheets) {
+                            throw new Error('Formato de arquivo inválido');
+                        }
+                        
+                        if (confirm('Isso substituirá todos os dados atuais. Tem certeza?')) {
+                            employees = backupData.employees;
+                            timesheets = backupData.timesheets;
+                            saveData();
+                            
+                            updateEmployeeSelects();
+                            renderEmployeesList();
+                            
+                            if (currentEmployeeId) {
+                                generateCalendar();
+                            }
+                            
+                            showNotification('Backup restaurado com sucesso!');
+                        }
+                    } catch (error) {
+                        showNotification('Erro ao restaurar backup: ' + error.message, 'error');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        // Limpar todos os dados
+        function clearAllData() {
+            if (!confirm('Isso apagará TODOS os dados (funcionários e registros). Tem certeza?')) {
+                return;
+            }
+            
+            localStorage.clear();
+            employees = [];
+            timesheets = {};
+            currentEmployeeId = '';
+            
+            updateEmployeeSelects();
+            renderEmployeesList();
+            
+            // Limpar tabela
+            document.getElementById('timesheetBody').innerHTML = `
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <i class="fas fa-calendar-day"></i>
+                        <p>Selecione um funcionário, mês e ano, depois clique em "Gerar Calendário" para começar</p>
+                    </td>
+                </tr>
+            `;
+            
+            // Limpar total
+            document.getElementById('totalMonthHours').textContent = '00:00';
+            
+            showNotification('Todos os dados foram removidos!', 'warning');
+        }
+        
+        // Formatar data
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+        
+        // Mostrar notificação
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            
+            notificationText.textContent = message;
+            notification.className = 'notification';
+            notification.classList.add(type);
+            
+            // Definir ícone baseado no tipo
+            const icon = notification.querySelector('i');
+            if (type === 'error') {
+                icon.className = 'fas fa-exclamation-circle';
+            } else if (type === 'warning') {
+                icon.className = 'fas fa-exclamation-triangle';
+            } else {
+                icon.className = 'fas fa-check-circle';
+            }
+            
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
