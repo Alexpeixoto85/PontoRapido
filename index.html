@@ -1195,7 +1195,7 @@
                     </select>
                 </div>
                 
-                .form-group {
+                <div class="form-group">
                     <label for="holidayDescription">Descrição (opcional)</label>
                     <textarea id="holidayDescription" rows="3" placeholder="Informações adicionais sobre o feriado"></textarea>
                 </div>
@@ -1219,6 +1219,8 @@
         let currentMonth = new Date().getMonth();
         let currentYear = new Date().getFullYear();
         let isEditingEmployee = false;
+        let autoSaveTimeout = null;
+        const AUTO_SAVE_DELAY = 2000; // 2 segundos
         
         const defaultHolidays = [
             { name: "Ano Novo", date: "2023-01-01", type: "feriado", recurring: true, description: "Confraternização Universal" },
@@ -1523,6 +1525,41 @@
                 holidays = [...defaultHolidays];
                 saveData();
             }
+            
+            // Garantir que todos os registros de ponto tenham os campos corretos
+            fixTimesheetsData();
+        }
+        
+        // Corrigir dados dos timesheets (para evitar NaN:NaN)
+        function fixTimesheetsData() {
+            Object.keys(timesheets).forEach(key => {
+                const daysData = timesheets[key];
+                Object.keys(daysData).forEach(day => {
+                    const dayData = daysData[day];
+                    
+                    // Garantir que total e balance sejam strings válidas
+                    if (dayData.total === undefined || dayData.total === null || dayData.total === 'NaN:NaN') {
+                        dayData.total = '';
+                    }
+                    if (dayData.balance === undefined || dayData.balance === null || dayData.balance === 'NaN:NaN') {
+                        dayData.balance = '';
+                    }
+                    
+                    // Recalcular se necessário
+                    if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                        const [empId, year, month] = key.split('-');
+                        const employee = employees.find(emp => emp.id === empId);
+                        if (employee) {
+                            const currentDate = new Date(parseInt(year), parseInt(month), parseInt(day));
+                            const dayOfWeek = currentDate.getDay();
+                            const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                            dayData.total = resultado.total;
+                            dayData.balance = resultado.balance;
+                        }
+                    }
+                });
+            });
+            saveData();
         }
         
         // Salvar dados no localStorage
@@ -1530,6 +1567,19 @@
             localStorage.setItem('pointRegisterEmployees', JSON.stringify(employees));
             localStorage.setItem('pointRegisterTimesheets', JSON.stringify(timesheets));
             localStorage.setItem('pointRegisterHolidays', JSON.stringify(holidays));
+        }
+        
+        // Salvamento automático
+        function triggerAutoSave() {
+            if (autoSaveTimeout) {
+                clearTimeout(autoSaveTimeout);
+            }
+            autoSaveTimeout = setTimeout(() => {
+                if (currentEmployeeId) {
+                    saveTimesheet();
+                    showNotification('Alterações salvas automaticamente.', 'info');
+                }
+            }, AUTO_SAVE_DELAY);
         }
         
         // Atualizar selects de funcionários
@@ -2247,6 +2297,7 @@
                     const dayOfWeek = new Date(year, month, parseInt(row.querySelector('.entrada').getAttribute('data-day'))).getDay();
                     calculateDailyTotalForRow(row, dayOfWeek);
                     calculateMonthTotal();
+                    triggerAutoSave();
                     
                     const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
                     if (day === daysInMonth) {
@@ -2364,6 +2415,7 @@
             
             calculateMonthTotal();
             updateSummaryCounts();
+            triggerAutoSave();
         }
         
         // Obter nome do dia da semana
@@ -2456,14 +2508,6 @@
             }
             
             const balanceMinutes = totalMinutes - expectedWorkloadMinutes;
-            
-            const formatMinutes = (minutes) => {
-                const sign = minutes < 0 ? '-' : '+';
-                const absMinutes = Math.abs(minutes);
-                const hours = Math.floor(absMinutes / 60);
-                const mins = absMinutes % 60;
-                return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-            };
             
             return {
                 total: formatMinutes(totalMinutes),
@@ -2627,6 +2671,7 @@
             });
             
             calculateMonthTotal();
+            triggerAutoSave();
             showNotification('Horários preenchidos automaticamente considerando jornada personalizada!');
         }
         
@@ -3527,7 +3572,7 @@
                                 return '';
                             };
                             
-                            daysData[day] = {
+                            const dayData = {
                                 entrada: formatTimeFromExcel(row[1]),
                                 saidaIntervalo: formatTimeFromExcel(row[2]),
                                 voltaIntervalo: formatTimeFromExcel(row[3]),
@@ -3540,12 +3585,26 @@
                             
                             if (row[5]) {
                                 const obs = row[5].toLowerCase();
-                                if (obs.includes('folga')) daysData[day].dayType = 'folga';
-                                else if (obs.includes('feriado')) daysData[day].dayType = 'feriado';
-                                else if (obs.includes('atestado')) daysData[day].dayType = 'atestado';
-                                else if (obs.includes('falta')) daysData[day].dayType = 'falta';
-                                else if (obs.includes('férias')) daysData[day].dayType = 'ferias';
+                                if (obs.includes('folga')) dayData.dayType = 'folga';
+                                else if (obs.includes('feriado')) dayData.dayType = 'feriado';
+                                else if (obs.includes('atestado')) dayData.dayType = 'atestado';
+                                else if (obs.includes('falta')) dayData.dayType = 'falta';
+                                else if (obs.includes('férias')) dayData.dayType = 'ferias';
                             }
+                            
+                            // Calcular total e saldo se houver horários
+                            if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                                const employee = employees.find(emp => emp.id === employeeId);
+                                if (employee) {
+                                    const currentDate = new Date(year, month, day);
+                                    const dayOfWeek = currentDate.getDay();
+                                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                                    dayData.total = resultado.total;
+                                    dayData.balance = resultado.balance;
+                                }
+                            }
+                            
+                            daysData[day] = dayData;
                         }
                     }
                     
@@ -3586,7 +3645,7 @@
                 timesheets,
                 holidays,
                 exportDate: new Date().toISOString(),
-                version: '4.0'
+                version: '4.1'
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -3602,7 +3661,7 @@
             showNotification('Backup exportado com sucesso!');
         }
         
-        // Restaurar backup COM MERGE
+        // Restaurar backup COM MERGE melhorado
         function importBackupMerge() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -3621,17 +3680,29 @@
                         }
                         
                         let addedEmployees = 0;
+                        let updatedEmployees = 0;
                         let addedTimesheets = 0;
+                        let updatedTimesheets = 0;
                         let addedHolidays = 0;
                         
+                        // Mesclar funcionários
                         backupData.employees.forEach(backupEmp => {
-                            const existingEmp = employees.find(emp => emp.id === backupEmp.id);
-                            if (!existingEmp) {
+                            const existingIndex = employees.findIndex(emp => emp.id === backupEmp.id);
+                            if (existingIndex === -1) {
                                 employees.push(backupEmp);
                                 addedEmployees++;
+                            } else {
+                                // Atualizar funcionário existente (manter dados locais, adicionar campos faltantes)
+                                const existingEmp = employees[existingIndex];
+                                employees[existingIndex] = {
+                                    ...backupEmp, // Dados do backup
+                                    ...existingEmp // Dados locais (sobrescrevem se existirem)
+                                };
+                                updatedEmployees++;
                             }
                         });
                         
+                        // Mesclar feriados
                         backupData.holidays.forEach(backupHoliday => {
                             const existingHoliday = holidays.find(h => 
                                 h.id === backupHoliday.id || 
@@ -3643,29 +3714,76 @@
                             }
                         });
                         
+                        // Mesclar registros de ponto
                         Object.keys(backupData.timesheets).forEach(key => {
                             if (!timesheets[key]) {
                                 timesheets[key] = backupData.timesheets[key];
                                 addedTimesheets++;
+                                
+                                // Garantir que os cálculos estejam corretos
+                                const [empId, sheetYear, sheetMonth] = key.split('-');
+                                const employee = employees.find(emp => emp.id === empId);
+                                if (employee) {
+                                    const daysData = timesheets[key];
+                                    Object.keys(daysData).forEach(day => {
+                                        const dayData = daysData[day];
+                                        if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                                            const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
+                                            const dayOfWeek = currentDate.getDay();
+                                            const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                                            dayData.total = resultado.total;
+                                            dayData.balance = resultado.balance;
+                                        }
+                                    });
+                                }
                             } else {
                                 const existingDays = timesheets[key];
                                 const backupDays = backupData.timesheets[key];
                                 let daysAdded = 0;
+                                let daysUpdated = 0;
                                 
                                 Object.keys(backupDays).forEach(day => {
-                                    if (!existingDays[day] || (!existingDays[day].entrada && backupDays[day].entrada)) {
-                                        existingDays[day] = backupDays[day];
+                                    const backupDay = backupDays[day];
+                                    
+                                    if (!existingDays[day]) {
+                                        existingDays[day] = backupDay;
                                         daysAdded++;
+                                    } else if (backupDay.entrada && backupDay.saida && 
+                                               (!existingDays[day].entrada || !existingDays[day].saida)) {
+                                        // Se o backup tem dados completos e o local não tem, usar o backup
+                                        existingDays[day] = backupDay;
+                                        daysUpdated++;
+                                    } else if (backupDay.dayType !== 'normal' && existingDays[day].dayType === 'normal') {
+                                        // Se o backup tem tipo especial e o local tem normal, usar o backup
+                                        existingDays[day].dayType = backupDay.dayType;
+                                        existingDays[day].dayTypeText = backupDay.dayTypeText;
+                                        daysUpdated++;
                                     }
                                 });
                                 
-                                if (daysAdded > 0) {
-                                    addedTimesheets++;
+                                if (daysAdded > 0 || daysUpdated > 0) {
+                                    updatedTimesheets++;
+                                    
+                                    // Recalcular se necessário
+                                    const [empId, sheetYear, sheetMonth] = key.split('-');
+                                    const employee = employees.find(emp => emp.id === empId);
+                                    if (employee) {
+                                        Object.keys(existingDays).forEach(day => {
+                                            const dayData = existingDays[day];
+                                            if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                                                const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
+                                                const dayOfWeek = currentDate.getDay();
+                                                const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                                                dayData.total = resultado.total;
+                                                dayData.balance = resultado.balance;
+                                            }
+                                        });
+                                    }
                                 }
                             }
                         });
                         
-                        if (addedEmployees > 0 || addedTimesheets > 0 || addedHolidays > 0) {
+                        if (addedEmployees > 0 || updatedEmployees > 0 || addedTimesheets > 0 || updatedTimesheets > 0 || addedHolidays > 0) {
                             saveData();
                             updateEmployeeSelects();
                             renderEmployeesList();
@@ -3675,7 +3793,14 @@
                                 generateCalendar();
                             }
                             
-                            showNotification(`Backup mesclado com sucesso! Adicionados: ${addedEmployees} funcionários, ${addedTimesheets} registros de ponto, ${addedHolidays} feriados.`);
+                            let message = 'Backup mesclado com sucesso! ';
+                            if (addedEmployees > 0) message += `Adicionados: ${addedEmployees} funcionários. `;
+                            if (updatedEmployees > 0) message += `Atualizados: ${updatedEmployees} funcionários. `;
+                            if (addedTimesheets > 0) message += `Adicionados: ${addedTimesheets} registros de ponto. `;
+                            if (updatedTimesheets > 0) message += `Atualizados: ${updatedTimesheets} registros de ponto. `;
+                            if (addedHolidays > 0) message += `Adicionados: ${addedHolidays} feriados.`;
+                            
+                            showNotification(message.trim());
                         } else {
                             showNotification('Nenhum novo dado encontrado no backup. Todos os dados já existem no sistema.', 'warning');
                         }
