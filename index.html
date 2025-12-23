@@ -704,29 +704,6 @@
                 padding: 20px;
             }
         }
-        
-        /* Novos estilos para exibição de horas extras */
-        .overtime-info {
-            font-size: 12px;
-            color: #666;
-            margin-top: 3px;
-        }
-        
-        .overtime-normal {
-            color: #ff9800;
-        }
-        
-        .overtime-night {
-            color: #9c27b0;
-        }
-        
-        .overtime-sunday {
-            color: #f44336;
-        }
-        
-        .overtime-holiday {
-            color: #ff5722;
-        }
     </style>
 </head>
 <body>
@@ -785,8 +762,8 @@
                     </div>
                     
                     <div style="display: flex; gap: 10px;">
-                        <button id="generateCalendar" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus"></i> Gerar Calendário
+                        <button id="exportCurrentPDF" class="btn btn-primary">
+                            <i class="fas fa-file-pdf"></i> Exportar PDF
                         </button>
                         <button id="autoFill" class="btn btn-secondary">
                             <i class="fas fa-magic"></i> Preencher Automático
@@ -817,7 +794,7 @@
                             <tr>
                                 <td colspan="10" class="empty-state">
                                     <i class="fas fa-calendar-day"></i>
-                                    <p>Selecione um funcionário, mês e ano, depois clique em "Gerar Calendário" para começar</p>
+                                    <p>Selecione um funcionário, mês e ano para começar</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -866,9 +843,6 @@
                     <div style="display: flex; gap: 10px;">
                         <button id="exportCurrent" class="btn btn-primary">
                             <i class="fas fa-file-excel"></i> Exportar Excel
-                        </button>
-                        <button id="exportCurrentPDF" class="btn btn-danger">
-                            <i class="fas fa-file-pdf"></i> Exportar PDF
                         </button>
                     </div>
                 </div>
@@ -1221,7 +1195,7 @@
                     </select>
                 </div>
                 
-                <div class="form-group">
+                .form-group {
                     <label for="holidayDescription">Descrição (opcional)</label>
                     <textarea id="holidayDescription" rows="3" placeholder="Informações adicionais sobre o feriado"></textarea>
                 </div>
@@ -1273,7 +1247,6 @@
             updateEmployeeSelects();
             renderEmployeesList();
             renderHolidaysList();
-            generateCalendar();
         });
         
         // Configurar tabs
@@ -1317,6 +1290,7 @@
             yearSelect.value = currentYear;
             filterYearSelect.value = currentYear;
             
+            // Gerar calendário automaticamente ao alterar mês/ano
             document.getElementById('monthSelect').addEventListener('change', function() {
                 if (currentEmployeeId) generateCalendar();
             });
@@ -1507,13 +1481,12 @@
         
         // Configurar eventos
         function setupEventListeners() {
-            document.getElementById('generateCalendar').addEventListener('click', generateCalendar);
+            document.getElementById('exportCurrentPDF').addEventListener('click', exportCurrentTimesheetPDF);
             document.getElementById('autoFill').addEventListener('click', autoFillTimesheet);
             document.getElementById('autoUpdate').addEventListener('click', autoUpdateBalances);
             document.getElementById('saveMonth').addEventListener('click', saveTimesheet);
             document.getElementById('clearMonth').addEventListener('click', clearTimesheet);
             document.getElementById('exportCurrent').addEventListener('click', exportCurrentTimesheet);
-            document.getElementById('exportCurrentPDF').addEventListener('click', exportCurrentTimesheetPDF);
             document.getElementById('employeeForm').addEventListener('submit', handleEmployeeForm);
             document.getElementById('holidayForm').addEventListener('submit', addHoliday);
             document.getElementById('applyMassLeave').addEventListener('click', applyMassLeave);
@@ -1525,9 +1498,14 @@
             document.getElementById('exportBackup').addEventListener('click', exportBackup);
             document.getElementById('importBackup').addEventListener('click', importBackupMerge);
             document.getElementById('clearAllData').addEventListener('click', clearAllData);
+            
+            // Gerar calendário automaticamente ao selecionar funcionário
             document.getElementById('employeeSelect').addEventListener('change', function() {
                 currentEmployeeId = this.value;
-                if (currentEmployeeId) generateCalendar();
+                if (currentEmployeeId) {
+                    generateCalendar();
+                    showNotification('Calendário gerado automaticamente!', 'info');
+                }
             });
         }
         
@@ -2099,10 +2077,9 @@
             };
         }
         
-        // Gerar calendário com domingos automaticamente como folga
+        // Gerar calendário (agora automático)
         function generateCalendar() {
             if (!currentEmployeeId) {
-                showNotification('Selecione um funcionário primeiro!', 'error');
                 return;
             }
             
@@ -2143,9 +2120,14 @@
                     isDefaultDayOff = true;
                 }
                 
-                // DOMINGO COMO FOLGA PADRÃO - ALTERAÇÃO AQUI
-                let defaultDayType = dayOfWeek === 0 ? 'folga' : 'normal';
-                let defaultDayTypeText = dayOfWeek === 0 ? 'Folga (Domingo)' : 'Dia Normal';
+                let defaultDayType = 'normal';
+                let defaultDayTypeText = 'Dia Normal';
+                
+                // DOMINGO COMO FOLGA PADRÃO
+                if (dayOfWeek === 0) {
+                    defaultDayType = 'folga';
+                    defaultDayTypeText = 'Folga (Domingo)';
+                }
                 
                 if (holiday) {
                     defaultDayType = holiday.type;
@@ -2184,26 +2166,13 @@
                 let saldoDiario = '';
                 let status = '';
                 let rowClass = '';
-                let overtimeInfo = '';
                 
-                if (dayData.dayType === 'normal' || dayData.dayType === 'falta') {
+                if (dayData.dayType === 'normal') {
                     if (dayData.entrada && dayData.saida) {
-                        const resultado = calculateDailyBalanceWithOvertime(dayData, employee, dayOfWeek, holiday);
+                        const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
                         totalDiario = resultado.total;
                         saldoDiario = resultado.balance;
                         status = '<span style="color: #2e7d32">Completo</span>';
-                        
-                        // Adicionar informação de horas extras se houver
-                        if (resultado.overtime && resultado.overtime.totalOvertimeMinutes > 0) {
-                            overtimeInfo = `
-                                <div class="overtime-info">
-                                    ${resultado.overtime.normalOvertime > 0 ? `<span class="overtime-normal">Extra: ${formatMinutes(resultado.overtime.normalOvertime)}</span>` : ''}
-                                    ${resultado.overtime.nightOvertime > 0 ? `<span class="overtime-night"> Noturna: ${formatMinutes(resultado.overtime.nightOvertime)}</span>` : ''}
-                                    ${resultado.overtime.sundayOvertime > 0 ? `<span class="overtime-sunday"> Dom: ${formatMinutes(resultado.overtime.sundayOvertime)}</span>` : ''}
-                                    ${resultado.overtime.holidayOvertime > 0 ? `<span class="overtime-holiday"> Feriado: ${formatMinutes(resultado.overtime.holidayOvertime)}</span>` : ''}
-                                </div>
-                            `;
-                        }
                     } else if (dayData.entrada || dayData.saidaIntervalo || dayData.voltaIntervalo || dayData.saida) {
                         status = '<span style="color: #ff9800">Parcial</span>';
                         rowClass = 'incomplete-day';
@@ -2211,7 +2180,7 @@
                         status = '<span style="color: #9e9e9e">Não preenchido</span>';
                         rowClass = 'empty-day';
                         
-                        // CALCULAR SALDO NEGATIVO AUTOMATICAMENTE PARA DIAS NORMAIS E FALTAS SEM REGISTRO
+                        // CALCULAR SALDO NEGATIVO AUTOMATICAMENTE PARA DIAS NORMAIS SEM REGISTRO
                         if (employee) {
                             const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
                             const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
@@ -2248,7 +2217,6 @@
                             ${dayTypeOptions}
                         </select>
                         <input type="text" class="day-type-text" data-day="${day}" value="${dayData.dayTypeText || ''}" placeholder="Motivo" style="margin-top: 5px; display: ${dayData.dayType !== 'normal' ? 'block' : 'none'}; width: 100%; padding: 4px; font-size: 12px;">
-                        ${overtimeInfo}
                     </td>
                     <td><input type="time" class="time-input entrada" data-day="${day}" value="${dayData.entrada}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
                     <td><input type="time" class="time-input saida-intervalo" data-day="${day}" value="${dayData.saidaIntervalo}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
@@ -2277,12 +2245,10 @@
                 input.addEventListener('change', function() {
                     const row = this.closest('tr');
                     const dayOfWeek = new Date(year, month, parseInt(row.querySelector('.entrada').getAttribute('data-day'))).getDay();
-                    const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
-                    const currentDate = new Date(year, month, day);
-                    const holiday = checkIfHoliday(currentDate);
-                    calculateDailyTotalForRow(row, dayOfWeek, holiday);
+                    calculateDailyTotalForRow(row, dayOfWeek);
                     calculateMonthTotal();
                     
+                    const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
                     if (day === daysInMonth) {
                         const entrada = row.querySelector('.entrada').value;
                         const saida = row.querySelector('.saida').value;
@@ -2301,7 +2267,7 @@
             calculateMonthTotal();
         }
         
-        // Atualizar automaticamente os saldos de todos os dias normais e faltas sem registro
+        // Atualizar automaticamente os saldos de todos os dias normais sem registro
         function autoUpdateBalances() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
@@ -2326,11 +2292,11 @@
                 const currentDate = new Date(year, month, day);
                 const dayOfWeek = currentDate.getDay();
                 
-                if (dayType === 'normal' || dayType === 'falta') {
+                if (dayType === 'normal') {
                     const entrada = row.querySelector('.entrada').value;
                     const saida = row.querySelector('.saida').value;
                     
-                    // Se for dia normal ou falta e não tiver registro
+                    // Se for dia normal e não tiver registro
                     if (!entrada && !saida) {
                         const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
                         const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
@@ -2396,25 +2362,6 @@
             row.querySelector('td:nth-child(8)').textContent = '';
             row.querySelector('td:nth-child(9)').textContent = '';
             
-            // Se mudou para falta, recalcular saldo negativo
-            if (newType === 'falta') {
-                const month = parseInt(document.getElementById('monthSelect').value);
-                const year = parseInt(document.getElementById('yearSelect').value);
-                const currentDate = new Date(year, month, parseInt(day));
-                const dayOfWeek = currentDate.getDay();
-                const employee = employees.find(emp => emp.id === currentEmployeeId);
-                
-                if (employee) {
-                    const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
-                    const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
-                    
-                    row.querySelector('td:nth-child(8)').textContent = '00:00';
-                    const saldoCell = row.querySelector('td:nth-child(9)');
-                    saldoCell.textContent = formatMinutes(-expectedMinutes);
-                    saldoCell.className = 'negative-balance';
-                }
-            }
-            
             calculateMonthTotal();
             updateSummaryCounts();
         }
@@ -2425,8 +2372,8 @@
             return days[dayIndex];
         }
         
-        // Calcular total diário para uma linha com cálculo de horas extras
-        function calculateDailyTotalForRow(row, dayOfWeek, holiday) {
+        // Calcular total diário para uma linha
+        function calculateDailyTotalForRow(row, dayOfWeek) {
             const day = row.querySelector('.entrada').getAttribute('data-day');
             const entrada = row.querySelector('.entrada').value;
             const saidaIntervalo = row.querySelector('.saida-intervalo').value;
@@ -2437,7 +2384,6 @@
             let totalDiario = '';
             let saldoDiario = '';
             let status = row.querySelector('td:last-child');
-            let overtimeInfo = '';
             
             if (dayType === 'normal') {
                 const employee = employees.find(emp => emp.id === currentEmployeeId);
@@ -2453,21 +2399,9 @@
                         saida
                     };
                     
-                    const resultado = calculateDailyBalanceWithOvertime(dayData, employee, dayOfWeek, holiday);
+                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
                     totalDiario = resultado.total;
                     saldoDiario = resultado.balance;
-                    
-                    // Adicionar informação de horas extras se houver
-                    if (resultado.overtime && resultado.overtime.totalOvertimeMinutes > 0) {
-                        overtimeInfo = `
-                            <div class="overtime-info">
-                                ${resultado.overtime.normalOvertime > 0 ? `<span class="overtime-normal">Extra: ${formatMinutes(resultado.overtime.normalOvertime)}</span>` : ''}
-                                ${resultado.overtime.nightOvertime > 0 ? `<span class="overtime-night"> Noturna: ${formatMinutes(resultado.overtime.nightOvertime)}</span>` : ''}
-                                ${resultado.overtime.sundayOvertime > 0 ? `<span class="overtime-sunday"> Dom: ${formatMinutes(resultado.overtime.sundayOvertime)}</span>` : ''}
-                                ${resultado.overtime.holidayOvertime > 0 ? `<span class="overtime-holiday"> Feriado: ${formatMinutes(resultado.overtime.holidayOvertime)}</span>` : ''}
-                            </div>
-                        `;
-                    }
                 } else if (entrada || saidaIntervalo || voltaIntervalo || saida) {
                     status.innerHTML = '<span style="color: #ff9800">Parcial</span>';
                     row.classList.add('incomplete-day');
@@ -2483,18 +2417,6 @@
                         saldoDiario = formatMinutes(-expectedMinutes);
                     }
                 }
-            } else if (dayType === 'falta') {
-                // Para faltas, o saldo é negativo da jornada diária
-                const employee = employees.find(emp => emp.id === currentEmployeeId);
-                if (employee) {
-                    const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
-                    const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
-                    totalDiario = '00:00';
-                    saldoDiario = formatMinutes(-expectedMinutes);
-                    
-                    status.innerHTML = '<span style="color: #d32f2f">Falta</span>';
-                    row.classList.add('day-type-falta');
-                }
             } else {
                 // Para não-dias normais, não há cálculo
             }
@@ -2503,113 +2425,58 @@
             const saldoCell = row.querySelector('td:nth-child(9)');
             saldoCell.textContent = saldoDiario;
             saldoCell.className = saldoDiario.startsWith('-') ? 'negative-balance' : 'positive-balance';
-            
-            // Atualizar informação de horas extras
-            const overtimeCell = row.querySelector('td:nth-child(3) .overtime-info');
-            if (overtimeCell) {
-                overtimeCell.outerHTML = overtimeInfo;
-            } else if (overtimeInfo) {
-                const typeCell = row.querySelector('td:nth-child(3)');
-                typeCell.innerHTML += overtimeInfo;
-            }
         }
         
-        // Calcular saldo diário com cálculo de horas extras (regras CLT)
-        function calculateDailyBalanceWithOvertime(dayData, employee, dayOfWeek, holiday) {
+        // Calcular saldo diário
+        function calculateDailyBalance(dayData, employee, dayOfWeek) {
             const entradaTime = timeToMinutes(dayData.entrada);
             const saidaTime = timeToMinutes(dayData.saida);
             
             let totalMinutes = saidaTime - entradaTime;
             
-            // Descontar intervalo se houver
-            if (dayData.saidaIntervalo && dayData.voltaIntervalo) {
+            let expectedWorkloadMinutes;
+            if (employee && employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
+                const dailyConfig = employee.dailyWorkloads[dayOfWeek];
+                expectedWorkloadMinutes = (dailyConfig.hours || employee.dailyWorkload || 8) * 60;
+            } else {
+                expectedWorkloadMinutes = (employee ? employee.dailyWorkload : 8) * 60;
+            }
+            
+            if (expectedWorkloadMinutes <= 360) {
+                dayData.saidaIntervalo = '';
+                dayData.voltaIntervalo = '';
+            } else if (expectedWorkloadMinutes > 360 && dayData.saidaIntervalo && dayData.voltaIntervalo) {
                 const saidaIntervaloTime = timeToMinutes(dayData.saidaIntervalo);
                 const voltaIntervaloTime = timeToMinutes(dayData.voltaIntervalo);
                 totalMinutes -= (voltaIntervaloTime - saidaIntervaloTime);
             }
             
-            // Obter jornada diária esperada
-            let expectedWorkloadMinutes;
-            if (employee && employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
-                expectedWorkloadMinutes = (employee.dailyWorkloads[dayOfWeek].hours || employee.dailyWorkload || 8) * 60;
-            } else {
-                expectedWorkloadMinutes = (employee ? employee.dailyWorkload : 8) * 60;
+            if (totalMinutes <= 0) {
+                return { total: '00:00', balance: '00:00' };
             }
             
-            // Inicializar variáveis para horas extras
-            let normalOvertime = 0;
-            let nightOvertime = 0;
-            let sundayOvertime = 0;
-            let holidayOvertime = 0;
-            let totalOvertimeMinutes = 0;
-            
-            const isSunday = (dayOfWeek === 0);
-            const isHoliday = holiday !== null;
-            
-            // Calcular horas extras baseadas nas regras da CLT
-            if (totalMinutes > expectedWorkloadMinutes) {
-                const overtimeMinutes = totalMinutes - expectedWorkloadMinutes;
-                
-                // Se for domingo
-                if (isSunday) {
-                    sundayOvertime = overtimeMinutes; // 100% adicional
-                    totalOvertimeMinutes = overtimeMinutes;
-                }
-                // Se for feriado
-                else if (isHoliday) {
-                    holidayOvertime = overtimeMinutes; // 100% adicional
-                    totalOvertimeMinutes = overtimeMinutes;
-                }
-                // Se for dia normal
-                else {
-                    // Calcular horas trabalhadas após 22:00 (noturnas)
-                    const entradaMin = timeToMinutes(dayData.entrada);
-                    const saidaMin = timeToMinutes(dayData.saida);
-                    const nightStartTime = 22 * 60; // 22:00 em minutos
-                    
-                    // Se houver trabalho após 22:00
-                    if (saidaMin > nightStartTime) {
-                        // Horas normais até 22:00
-                        const normalWorkUntil22 = Math.min(overtimeMinutes, nightStartTime - entradaMin);
-                        normalOvertime = normalWorkUntil22 > 0 ? normalWorkUntil22 : 0;
-                        
-                        // Horas noturnas após 22:00
-                        nightOvertime = overtimeMinutes - normalOvertime;
-                        
-                        // Ajustar para não exceder o total
-                        if (nightOvertime < 0) nightOvertime = 0;
-                    } else {
-                        // Todas as horas extras são normais
-                        normalOvertime = overtimeMinutes;
-                    }
-                    
-                    totalOvertimeMinutes = normalOvertime + nightOvertime;
-                }
-            }
-            
-            // Calcular saldo (horas trabalhadas - jornada esperada)
             const balanceMinutes = totalMinutes - expectedWorkloadMinutes;
+            
+            const formatMinutes = (minutes) => {
+                const sign = minutes < 0 ? '-' : '+';
+                const absMinutes = Math.abs(minutes);
+                const hours = Math.floor(absMinutes / 60);
+                const mins = absMinutes % 60;
+                return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+            };
             
             return {
                 total: formatMinutes(totalMinutes),
-                balance: formatMinutes(balanceMinutes),
-                overtime: {
-                    normalOvertime,
-                    nightOvertime,
-                    sundayOvertime,
-                    holidayOvertime,
-                    totalOvertimeMinutes
-                }
+                balance: formatMinutes(balanceMinutes)
             };
         }
         
         // Formatar minutos para HH:MM com sinal
         function formatMinutes(minutes) {
-            const isNegative = minutes < 0;
+            const sign = minutes < 0 ? '-' : '+';
             const absMinutes = Math.abs(minutes);
             const hours = Math.floor(absMinutes / 60);
-            const mins = Math.floor(absMinutes % 60);
-            const sign = isNegative ? '-' : '+';
+            const mins = absMinutes % 60;
             return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
         }
         
@@ -2645,7 +2512,7 @@
             rows.forEach(row => {
                 const dayType = row.querySelector('.day-type-select').value;
                 
-                if (dayType === 'normal' || dayType === 'falta') {
+                if (dayType === 'normal') {
                     const totalCell = row.querySelector('td:nth-child(8)').textContent;
                     const balanceCell = row.querySelector('td:nth-child(9)').textContent;
                     
@@ -2754,8 +2621,7 @@
                             row.querySelector('.volta-intervalo').value = '';
                         }
                         
-                        const holiday = checkIfHoliday(currentDate);
-                        calculateDailyTotalForRow(row, dayOfWeek, holiday);
+                        calculateDailyTotalForRow(row, dayOfWeek);
                     }
                 }
             });
@@ -2792,13 +2658,6 @@
                 const totalCell = row.querySelector('td:nth-child(8)').textContent;
                 const balanceCell = row.querySelector('td:nth-child(9)').textContent;
                 
-                // Extrair informações de horas extras se existirem
-                let overtimeInfo = '';
-                const overtimeElement = row.querySelector('.overtime-info');
-                if (overtimeElement) {
-                    overtimeInfo = overtimeElement.innerHTML;
-                }
-                
                 daysData[day] = {
                     entrada: row.querySelector('.entrada').value,
                     saidaIntervalo: row.querySelector('.saida-intervalo').value,
@@ -2807,8 +2666,7 @@
                     dayType: dayType,
                     dayTypeText: dayTypeText,
                     total: totalCell,
-                    balance: balanceCell,
-                    overtimeInfo: overtimeInfo
+                    balance: balanceCell
                 };
             });
             
@@ -2857,7 +2715,7 @@
             const monthName = getMonthName(month);
             
             const data = [];
-            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Horas Extras", "Observações"]);
+            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
             
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
@@ -2870,8 +2728,7 @@
                     dayType: 'normal',
                     dayTypeText: '',
                     total: '',
-                    balance: '',
-                    overtimeInfo: ''
+                    balance: ''
                 };
                 
                 const formatTime = (time) => {
@@ -2884,9 +2741,6 @@
                     observacoes = dayData.dayTypeText || dayData.dayType;
                 }
                 
-                // Extrair informações de horas extras
-                let horasExtras = dayData.overtimeInfo || '';
-                
                 data.push([
                     day,
                     formatTime(dayData.entrada),
@@ -2895,7 +2749,6 @@
                     formatTime(dayData.saida),
                     dayData.total || '',
                     dayData.balance || '',
-                    horasExtras,
                     observacoes
                 ]);
             }
@@ -2911,7 +2764,6 @@
                 {wch: 10},
                 {wch: 10},
                 {wch: 10},
-                {wch: 30},
                 {wch: 30}
             ];
             ws['!cols'] = wscols;
@@ -2982,7 +2834,7 @@
             doc.line(marginLeft, yPos, pageWidth - marginRight, yPos);
             yPos += 5;
             
-            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Horas Extras"]];
+            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Status"]];
             
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const tableData = [];
@@ -2993,7 +2845,6 @@
             let totalFeriados = 0;
             let totalAtestados = 0;
             let totalFaltas = 0;
-            let totalHorasExtras = 0;
             
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = new Date(year, month, day);
@@ -3008,8 +2859,7 @@
                     dayType: 'normal',
                     dayTypeText: '',
                     total: '',
-                    balance: '',
-                    overtimeInfo: ''
+                    balance: ''
                 };
                 
                 let tipoDia = 'Normal';
@@ -3027,15 +2877,6 @@
                     totalFaltas++;
                 }
                 
-                let horasExtras = '';
-                if (dayData.overtimeInfo) {
-                    // Extrair apenas os valores numéricos das horas extras
-                    const overtimeMatch = dayData.overtimeInfo.match(/\d+/g);
-                    if (overtimeMatch) {
-                        horasExtras = dayData.overtimeInfo.replace(/<[^>]*>/g, '');
-                    }
-                }
-                
                 if (dayData.dayType === 'normal' && dayData.total) {
                     const timeStr = dayData.total.replace(/[+-]/, '');
                     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -3047,18 +2888,6 @@
                         const [bHours, bMinutes] = balanceStr.split(':').map(Number);
                         const saldo = (isNegative ? -1 : 1) * (bHours * 60 + bMinutes);
                         totalSaldo += saldo;
-                    }
-                    
-                    // Contabilizar horas extras
-                    if (horasExtras) {
-                        const extraMatch = horasExtras.match(/\d+/g);
-                        if (extraMatch) {
-                            for (let i = 0; i < extraMatch.length; i += 2) {
-                                if (i + 1 < extraMatch.length) {
-                                    totalHorasExtras += parseInt(extraMatch[i]) * 60 + parseInt(extraMatch[i + 1]);
-                                }
-                            }
-                        }
                     }
                 }
                 
@@ -3072,7 +2901,7 @@
                     dayData.saida || '',
                     dayData.total || '',
                     dayData.balance || '',
-                    horasExtras || ''
+                    dayData.dayTypeText || ''
                 ]);
             }
             
@@ -3115,9 +2944,6 @@
             resumoY += 6;
             doc.text(`Atestados: ${totalAtestados} dias`, marginLeft, resumoY);
             doc.text(`Faltas: ${totalFaltas} dias`, marginLeft + 60, resumoY);
-            
-            resumoY += 6;
-            doc.text(`Horas Extras: ${formatMinutesToHours(totalHorasExtras)}`, marginLeft, resumoY);
             
             const footerY = pageHeight - 20;
             doc.setFontSize(8);
@@ -3236,12 +3062,11 @@
             
             yPos += 5;
             
-            const headers = [["Mês/Ano", "Dias Úteis", "Horas Trabalhadas", "Saldo Total", "Horas Extras", "Folgas", "Feriados", "Atestados", "Faltas"]];
+            const headers = [["Mês/Ano", "Dias Úteis", "Horas Trabalhadas", "Saldo Total", "Folgas", "Feriados", "Atestados", "Faltas"]];
             const tableData = [];
             
             let totalGeralHorasTrabalhadas = 0;
             let totalGeralSaldo = 0;
-            let totalGeralHorasExtras = 0;
             let totalGeralDiasUteis = 0;
             let totalGeralFolgas = 0;
             let totalGeralFeriados = 0;
@@ -3255,7 +3080,6 @@
                 
                 let horasTrabalhadasMes = 0;
                 let saldoMes = 0;
-                let horasExtrasMes = 0;
                 let diasUteisMes = 0;
                 let folgasMes = 0;
                 let feriadosMes = 0;
@@ -3268,8 +3092,7 @@
                     const dayData = daysData && daysData[day] ? daysData[day] : {
                         dayType: 'normal',
                         total: '',
-                        balance: '',
-                        overtimeInfo: ''
+                        balance: ''
                     };
                     
                     if (dayData.dayType === 'normal') {
@@ -3288,18 +3111,6 @@
                             const saldo = (isNegative ? -1 : 1) * (bHours * 60 + bMinutes);
                             saldoMes += saldo;
                         }
-                        
-                        // Calcular horas extras
-                        if (dayData.overtimeInfo) {
-                            const overtimeMatch = dayData.overtimeInfo.match(/\d+/g);
-                            if (overtimeMatch) {
-                                for (let i = 0; i < overtimeMatch.length; i += 2) {
-                                    if (i + 1 < overtimeMatch.length) {
-                                        horasExtrasMes += parseInt(overtimeMatch[i]) * 60 + parseInt(overtimeMatch[i + 1]);
-                                    }
-                                }
-                            }
-                        }
                     } else if (dayData.dayType === 'folga') {
                         folgasMes++;
                     } else if (dayData.dayType === 'feriado') {
@@ -3313,14 +3124,12 @@
                 
                 const horasTrabalhadasFormat = (horasTrabalhadasMes / 60).toFixed(2);
                 const saldoFormat = (saldoMes / 60).toFixed(2);
-                const horasExtrasFormat = (horasExtrasMes / 60).toFixed(2);
                 
                 tableData.push([
                     `${monthName}/${sheetYear}`,
                     diasUteisMes.toString(),
                     horasTrabalhadasFormat,
                     saldoFormat,
-                    horasExtrasFormat,
                     folgasMes.toString(),
                     feriadosMes.toString(),
                     atestadosMes.toString(),
@@ -3329,7 +3138,6 @@
                 
                 totalGeralHorasTrabalhadas += horasTrabalhadasMes;
                 totalGeralSaldo += saldoMes;
-                totalGeralHorasExtras += horasExtrasMes;
                 totalGeralDiasUteis += diasUteisMes;
                 totalGeralFolgas += folgasMes;
                 totalGeralFeriados += feriadosMes;
@@ -3339,14 +3147,12 @@
             
             const totalHorasTrabalhadasFormat = (totalGeralHorasTrabalhadas / 60).toFixed(2);
             const totalSaldoFormat = (totalGeralSaldo / 60).toFixed(2);
-            const totalHorasExtrasFormat = (totalGeralHorasExtras / 60).toFixed(2);
             
             tableData.push([
                 "TOTAL GERAL",
                 totalGeralDiasUteis.toString(),
                 totalHorasTrabalhadasFormat,
                 totalSaldoFormat,
-                totalHorasExtrasFormat,
                 totalGeralFolgas.toString(),
                 totalGeralFeriados.toString(),
                 totalGeralAtestados.toString(),
@@ -3393,9 +3199,6 @@
                 doc.text(`Saldo Total Acumulado: ${totalSaldoFormat}h`, marginLeft + 80, analiseY);
                 
                 analiseY += 6;
-                doc.text(`Total de Horas Extras: ${totalHorasExtrasFormat}h`, marginLeft, analiseY);
-                
-                analiseY += 6;
                 const mediaHorasPorDia = totalGeralDiasUteis > 0 ? (totalGeralHorasTrabalhadas / 60 / totalGeralDiasUteis).toFixed(2) : '0.00';
                 doc.text(`Média de Horas por Dia Útil: ${mediaHorasPorDia}h`, marginLeft, analiseY);
                 
@@ -3414,14 +3217,12 @@
                 analiseY += 8;
                 doc.text('1. Saldo positivo indica horas extras, negativo indica déficit.', marginLeft, analiseY);
                 analiseY += 6;
-                doc.text('2. Horas extras em domingos/feriados: 100% de adicional.', marginLeft, analiseY);
+                doc.text('2. Feriados nacionais são automaticamente considerados como dias não trabalhados.', marginLeft, analiseY);
                 analiseY += 6;
-                doc.text('3. Horas extras noturnas (após 22:00): 50% + 20% noturno.', marginLeft, analiseY);
-                analiseY += 6;
-                doc.text('4. Faltas geram saldo negativo equivalente à jornada diária.', marginLeft, analiseY);
+                doc.text('3. Folgas semanais são configuradas individualmente para cada funcionário.', marginLeft, analiseY);
                 analiseY += 6;
                 if (employee.dailyWorkloads) {
-                    doc.text('5. Este funcionário possui jornada personalizada por dia da semana.', marginLeft, analiseY);
+                    doc.text('4. Este funcionário possui jornada personalizada por dia da semana.', marginLeft, analiseY);
                 }
             }
             
@@ -3518,7 +3319,7 @@
                                 const daysData = timesheets[key];
                                 
                                 const data = [];
-                                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Horas Extras", "Observações"]);
+                                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
                                 
                                 const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
                                 
@@ -3531,8 +3332,7 @@
                                         dayType: 'normal',
                                         dayTypeText: '',
                                         total: '',
-                                        balance: '',
-                                        overtimeInfo: ''
+                                        balance: ''
                                     };
                                     
                                     const formatTime = (time) => {
@@ -3553,7 +3353,6 @@
                                         formatTime(dayData.saida),
                                         dayData.total || '',
                                         dayData.balance || '',
-                                        dayData.overtimeInfo || '',
                                         observacoes
                                     ]);
                                 }
@@ -3568,7 +3367,6 @@
                                     {wch: 10},
                                     {wch: 10},
                                     {wch: 10},
-                                    {wch: 30},
                                     {wch: 30}
                                 ];
                                 ws['!cols'] = wscols;
@@ -3592,7 +3390,7 @@
                             const daysData = timesheets[key];
                             
                             const data = [];
-                            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Horas Extras", "Observações"]);
+                            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
                             
                             const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
                             
@@ -3605,8 +3403,7 @@
                                     dayType: 'normal',
                                     dayTypeText: '',
                                     total: '',
-                                    balance: '',
-                                    overtimeInfo: ''
+                                    balance: ''
                                 };
                                 
                                 const formatTime = (time) => {
@@ -3627,7 +3424,6 @@
                                     formatTime(dayData.saida),
                                     dayData.total || '',
                                     dayData.balance || '',
-                                    dayData.overtimeInfo || '',
                                     observacoes
                                 ]);
                             }
@@ -3642,7 +3438,6 @@
                                 {wch: 10},
                                 {wch: 10},
                                 {wch: 10},
-                                {wch: 30},
                                 {wch: 30}
                             ];
                             ws['!cols'] = wscols;
@@ -3791,7 +3586,7 @@
                 timesheets,
                 holidays,
                 exportDate: new Date().toISOString(),
-                version: '5.0'
+                version: '4.0'
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -3916,7 +3711,7 @@
                 <tr>
                     <td colspan="10" class="empty-state">
                         <i class="fas fa-calendar-day"></i>
-                        <p>Selecione um funcionário, mês e ano, depois clique em "Gerar Calendário" para começar</p>
+                        <p>Selecione um funcionário, mês e ano para começar</p>
                     </td>
                 </tr>
             `;
