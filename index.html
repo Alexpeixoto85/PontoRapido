@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -299,13 +298,32 @@
             border-radius: 4px;
             border: 1px solid #ddd;
             font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .day-type-text, .atestado-hours {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .atestado-hours {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ff9800;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 5px;
         }
         
         .weekend {
             background-color: #f0f4ff;
         }
         
-        .weekend .time-input, .weekend .day-type-select {
+        .weekend .time-input, .weekend .day-type-select, .weekend .day-type-text, .weekend .atestado-hours {
             background-color: #f8faff;
         }
         
@@ -313,7 +331,7 @@
             background-color: #e8f5e9;
         }
         
-        .today .time-input, .today .day-type-select {
+        .today .time-input, .today .day-type-select, .today .day-type-text, .today .atestado-hours {
             background-color: #f1f8e9;
         }
         
@@ -710,7 +728,7 @@
     <div class="container">
         <header>
             <h1><i class="fas fa-fingerprint"></i> Sistema de Registro de Ponto Completo</h1>
-            <p class="subtitle">Controle mensal com cálculo de horas extras, folgas, feriados e exportação PDF/Excel</p>
+            <p class="subtitle">Controle mensal com cálculo de horas extras, folgas, feriados e atestados parciais</p>
         </header>
         
         <div class="tabs">
@@ -726,7 +744,7 @@
                 <div class="actions-bar">
                     <div>
                         <h2 class="card-title"><i class="fas fa-calendar-alt"></i> Registro de Ponto Mensal</h2>
-                        <p>Preencha os horários de ponto - horas extras são calculadas automaticamente</p>
+                        <p>Preencha os horários de ponto - Atestados podem ser parciais (informe as horas cobertas)</p>
                     </div>
                     
                     <div class="form-group" style="width: 250px;">
@@ -780,7 +798,7 @@
                             <tr>
                                 <th width="60">Dia</th>
                                 <th width="120">Dia da Semana</th>
-                                <th width="180">Tipo de Dia</th>
+                                <th width="220">Tipo de Dia / Atestado (h)</th>
                                 <th width="150">Entrada</th>
                                 <th width="180">Saída (Intervalo)</th>
                                 <th width="180">Volta (Intervalo)</th>
@@ -1023,7 +1041,7 @@
         
         <div class="footer">
             <p>Sistema de Registro de Ponto Completo - Para uso local | Dados armazenados no navegador</p>
-            <p>© 2023 - Com controle de folgas, feriados e cálculo automático de saldo de horas</p>
+            <p>© 2023 - Com controle de folgas, feriados e atestados parciais</p>
         </div>
         
         <div id="notification" class="notification">
@@ -1545,8 +1563,13 @@
                         dayData.balance = '';
                     }
                     
+                    // Garantir que atestadoHours exista
+                    if (dayData.atestadoHours === undefined) {
+                        dayData.atestadoHours = '';
+                    }
+                    
                     // Recalcular se necessário
-                    if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                    if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
                         const [empId, year, month] = key.split('-');
                         const employee = employees.find(emp => emp.id === empId);
                         if (employee) {
@@ -2200,6 +2223,7 @@
                     saida: '',
                     dayType: defaultDayType,
                     dayTypeText: defaultDayTypeText,
+                    atestadoHours: '',
                     observacao: ''
                 };
                 
@@ -2212,16 +2236,19 @@
                 else if (dayData.dayType === 'atestado') totalAtestados++;
                 else if (dayData.dayType === 'falta') totalFaltas++;
                 
+                // Calcular total e saldo para todos os tipos que podem ter horas (normal e atestado)
                 let totalDiario = '';
                 let saldoDiario = '';
                 let status = '';
                 let rowClass = '';
                 
-                if (dayData.dayType === 'normal') {
+                if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                    // Para atestado, se não houver horas preenchidas, consideramos que não trabalhou
+                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                    totalDiario = resultado.total;
+                    saldoDiario = resultado.balance;
+                    
                     if (dayData.entrada && dayData.saida) {
-                        const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
-                        totalDiario = resultado.total;
-                        saldoDiario = resultado.balance;
                         status = '<span style="color: #2e7d32">Completo</span>';
                     } else if (dayData.entrada || dayData.saidaIntervalo || dayData.voltaIntervalo || dayData.saida) {
                         status = '<span style="color: #ff9800">Parcial</span>';
@@ -2229,14 +2256,6 @@
                     } else {
                         status = '<span style="color: #9e9e9e">Não preenchido</span>';
                         rowClass = 'empty-day';
-                        
-                        // CALCULAR SALDO NEGATIVO AUTOMATICAMENTE PARA DIAS NORMAIS SEM REGISTRO
-                        if (employee) {
-                            const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
-                            const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
-                            totalDiario = '00:00';
-                            saldoDiario = formatMinutes(-expectedMinutes);
-                        }
                     }
                 } else {
                     status = `<span style="color: #5d4037">${dayData.dayTypeText || dayData.dayType}</span>`;
@@ -2259,19 +2278,27 @@
                     <option value="compensacao" ${dayData.dayType === 'compensacao' ? 'selected' : ''}>Banco de Horas</option>
                 `;
                 
+                // Criar célula de tipo de dia com select, motivo e horas de atestado
+                const tipoCell = document.createElement('td');
+                tipoCell.innerHTML = `
+                    <select class="day-type-select" data-day="${day}" data-original="${dayData.dayType}">
+                        ${dayTypeOptions}
+                    </select>
+                    <input type="text" class="day-type-text" data-day="${day}" value="${dayData.dayTypeText || ''}" placeholder="Motivo" style="margin-top: 5px; display: ${dayData.dayType !== 'normal' ? 'block' : 'none'}; width: 100%; padding: 4px; font-size: 12px;">
+                    <input type="number" class="atestado-hours" data-day="${day}" value="${dayData.atestadoHours || ''}" placeholder="Horas atestado" min="0" max="24" step="0.5" style="margin-top: 5px; display: ${dayData.dayType === 'atestado' ? 'block' : 'none'}; width: 100%; padding: 4px; font-size: 12px;">
+                `;
+                
                 row.innerHTML = `
                     <td>${day}</td>
                     <td>${dayName}</td>
-                    <td>
-                        <select class="day-type-select" data-day="${day}" data-original="${dayData.dayType}">
-                            ${dayTypeOptions}
-                        </select>
-                        <input type="text" class="day-type-text" data-day="${day}" value="${dayData.dayTypeText || ''}" placeholder="Motivo" style="margin-top: 5px; display: ${dayData.dayType !== 'normal' ? 'block' : 'none'}; width: 100%; padding: 4px; font-size: 12px;">
-                    </td>
-                    <td><input type="time" class="time-input entrada" data-day="${day}" value="${dayData.entrada}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
-                    <td><input type="time" class="time-input saida-intervalo" data-day="${day}" value="${dayData.saidaIntervalo}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
-                    <td><input type="time" class="time-input volta-intervalo" data-day="${day}" value="${dayData.voltaIntervalo}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
-                    <td><input type="time" class="time-input saida" data-day="${day}" value="${dayData.saida}" ${dayData.dayType !== 'normal' ? 'disabled' : ''}></td>
+                `;
+                // Substituir a terceira célula pela célula personalizada
+                row.appendChild(tipoCell);
+                row.innerHTML += `
+                    <td><input type="time" class="time-input entrada" data-day="${day}" value="${dayData.entrada}" ${dayData.dayType !== 'normal' && dayData.dayType !== 'atestado' ? 'disabled' : ''}></td>
+                    <td><input type="time" class="time-input saida-intervalo" data-day="${day}" value="${dayData.saidaIntervalo}" ${dayData.dayType !== 'normal' && dayData.dayType !== 'atestado' ? 'disabled' : ''}></td>
+                    <td><input type="time" class="time-input volta-intervalo" data-day="${day}" value="${dayData.voltaIntervalo}" ${dayData.dayType !== 'normal' && dayData.dayType !== 'atestado' ? 'disabled' : ''}></td>
+                    <td><input type="time" class="time-input saida" data-day="${day}" value="${dayData.saida}" ${dayData.dayType !== 'normal' && dayData.dayType !== 'atestado' ? 'disabled' : ''}></td>
                     <td>${totalDiario}</td>
                     <td class="${saldoDiario.startsWith('-') ? 'negative-balance' : 'positive-balance'}">${saldoDiario}</td>
                     <td>${status}</td>
@@ -2291,6 +2318,16 @@
                 });
             });
             
+            document.querySelectorAll('.atestado-hours').forEach(input => {
+                input.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    const dayOfWeek = new Date(year, month, parseInt(row.querySelector('.entrada').getAttribute('data-day'))).getDay();
+                    calculateDailyTotalForRow(row, dayOfWeek);
+                    calculateMonthTotal();
+                    triggerAutoSave();
+                });
+            });
+            
             document.querySelectorAll('.time-input').forEach(input => {
                 input.addEventListener('change', function() {
                     const row = this.closest('tr');
@@ -2305,7 +2342,7 @@
                         const saida = row.querySelector('.saida').value;
                         const dayType = row.querySelector('.day-type-select').value;
                         
-                        if (dayType === 'normal' && entrada && saida) {
+                        if ((dayType === 'normal' || dayType === 'atestado') && entrada && saida) {
                             setTimeout(() => {
                                 saveTimesheet();
                                 showNotification('Último dia do mês preenchido. Registros salvos automaticamente!');
@@ -2343,7 +2380,7 @@
                 const currentDate = new Date(year, month, day);
                 const dayOfWeek = currentDate.getDay();
                 
-                if (dayType === 'normal') {
+                if (dayType === 'normal' || dayType === 'atestado') {
                     const entrada = row.querySelector('.entrada').value;
                     const saida = row.querySelector('.saida').value;
                     
@@ -2351,14 +2388,16 @@
                     if (!entrada && !saida) {
                         const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
                         const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
+                        const atestadoHours = parseFloat(row.querySelector('.atestado-hours')?.value) || 0;
+                        const requiredMinutes = dayType === 'atestado' ? expectedMinutes - (atestadoHours * 60) : expectedMinutes;
                         
                         // Atualizar célula de total
                         row.querySelector('td:nth-child(8)').textContent = '00:00';
                         
-                        // Atualizar célula de saldo com valor negativo
+                        // Atualizar célula de saldo
                         const saldoCell = row.querySelector('td:nth-child(9)');
-                        saldoCell.textContent = formatMinutes(-expectedMinutes);
-                        saldoCell.className = expectedMinutes > 0 ? 'negative-balance' : 'positive-balance';
+                        saldoCell.textContent = formatMinutes(-requiredMinutes);
+                        saldoCell.className = requiredMinutes > 0 ? 'negative-balance' : 'positive-balance';
                         
                         updatedCount++;
                     }
@@ -2387,10 +2426,13 @@
             const textInput = row.querySelector('.day-type-text');
             textInput.style.display = newType !== 'normal' ? 'block' : 'none';
             
+            const atestadoInput = row.querySelector('.atestado-hours');
+            atestadoInput.style.display = newType === 'atestado' ? 'block' : 'none';
+            
             const timeInputs = row.querySelectorAll('.time-input');
             timeInputs.forEach(input => {
-                input.disabled = newType !== 'normal';
-                if (newType !== 'normal') {
+                input.disabled = !(newType === 'normal' || newType === 'atestado');
+                if (!(newType === 'normal' || newType === 'atestado')) {
                     input.value = '';
                 }
             });
@@ -2402,7 +2444,7 @@
             
             const statusCell = row.querySelector('td:last-child');
             let statusText = newType;
-            if (newType === 'normal') {
+            if (newType === 'normal' || newType === 'atestado') {
                 statusText = '<span style="color: #9e9e9e">Não preenchido</span>';
             } else {
                 statusText = newType.charAt(0).toUpperCase() + newType.slice(1);
@@ -2432,12 +2474,13 @@
             const voltaIntervalo = row.querySelector('.volta-intervalo').value;
             const saida = row.querySelector('.saida').value;
             const dayType = row.querySelector('.day-type-select').value;
+            const atestadoHours = parseFloat(row.querySelector('.atestado-hours')?.value) || 0;
             
             let totalDiario = '';
             let saldoDiario = '';
             let status = row.querySelector('td:last-child');
             
-            if (dayType === 'normal') {
+            if (dayType === 'normal' || dayType === 'atestado') {
                 const employee = employees.find(emp => emp.id === currentEmployeeId);
                 
                 if (entrada && saida) {
@@ -2448,7 +2491,9 @@
                         entrada,
                         saidaIntervalo,
                         voltaIntervalo,
-                        saida
+                        saida,
+                        dayType,
+                        atestadoHours
                     };
                     
                     const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
@@ -2457,16 +2502,29 @@
                 } else if (entrada || saidaIntervalo || voltaIntervalo || saida) {
                     status.innerHTML = '<span style="color: #ff9800">Parcial</span>';
                     row.classList.add('incomplete-day');
+                    
+                    // Mesmo parcial, tentamos calcular
+                    const dayData = {
+                        entrada,
+                        saidaIntervalo,
+                        voltaIntervalo,
+                        saida,
+                        dayType,
+                        atestadoHours
+                    };
+                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                    totalDiario = resultado.total;
+                    saldoDiario = resultado.balance;
                 } else {
                     status.innerHTML = '<span style="color: #9e9e9e">Não preenchido</span>';
                     row.classList.remove('incomplete-day');
                     
-                    // CALCULAR SALDO NEGATIVO PARA DIAS NORMAIS SEM REGISTRO
                     if (employee) {
                         const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
                         const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
+                        const requiredMinutes = dayType === 'atestado' ? expectedMinutes - (atestadoHours * 60) : expectedMinutes;
                         totalDiario = '00:00';
-                        saldoDiario = formatMinutes(-expectedMinutes);
+                        saldoDiario = formatMinutes(-requiredMinutes);
                     }
                 }
             } else {
@@ -2479,13 +2537,28 @@
             saldoCell.className = saldoDiario.startsWith('-') ? 'negative-balance' : 'positive-balance';
         }
         
-        // Calcular saldo diário
+        // Calcular saldo diário (incluindo atestado)
         function calculateDailyBalance(dayData, employee, dayOfWeek) {
+            // Se não for normal nem atestado, retorna vazio
+            if (dayData.dayType !== 'normal' && dayData.dayType !== 'atestado') {
+                return { total: '', balance: '' };
+            }
+            
             const entradaTime = timeToMinutes(dayData.entrada);
             const saidaTime = timeToMinutes(dayData.saida);
             
             let totalMinutes = saidaTime - entradaTime;
             
+            // Subtrair intervalo se existir
+            if (dayData.saidaIntervalo && dayData.voltaIntervalo) {
+                const saidaIntervaloTime = timeToMinutes(dayData.saidaIntervalo);
+                const voltaIntervaloTime = timeToMinutes(dayData.voltaIntervalo);
+                totalMinutes -= (voltaIntervaloTime - saidaIntervaloTime);
+            }
+            
+            if (totalMinutes < 0) totalMinutes = 0;
+            
+            // Calcular jornada esperada
             let expectedWorkloadMinutes;
             if (employee && employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
                 const dailyConfig = employee.dailyWorkloads[dayOfWeek];
@@ -2494,20 +2567,14 @@
                 expectedWorkloadMinutes = (employee ? employee.dailyWorkload : 8) * 60;
             }
             
-            if (expectedWorkloadMinutes <= 360) {
-                dayData.saidaIntervalo = '';
-                dayData.voltaIntervalo = '';
-            } else if (expectedWorkloadMinutes > 360 && dayData.saidaIntervalo && dayData.voltaIntervalo) {
-                const saidaIntervaloTime = timeToMinutes(dayData.saidaIntervalo);
-                const voltaIntervaloTime = timeToMinutes(dayData.voltaIntervalo);
-                totalMinutes -= (voltaIntervaloTime - saidaIntervaloTime);
+            // Se for atestado, subtrair as horas cobertas
+            let requiredMinutes = expectedWorkloadMinutes;
+            if (dayData.dayType === 'atestado' && dayData.atestadoHours) {
+                const atestadoMinutes = parseFloat(dayData.atestadoHours) * 60;
+                requiredMinutes = Math.max(0, expectedWorkloadMinutes - atestadoMinutes);
             }
             
-            if (totalMinutes <= 0) {
-                return { total: '00:00', balance: '00:00' };
-            }
-            
-            const balanceMinutes = totalMinutes - expectedWorkloadMinutes;
+            const balanceMinutes = totalMinutes - requiredMinutes;
             
             return {
                 total: formatMinutes(totalMinutes),
@@ -2522,6 +2589,17 @@
             const hours = Math.floor(absMinutes / 60);
             const mins = absMinutes % 60;
             return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        }
+        
+        // Nova função: formata minutos para HH:MM (sem sinal para totais, com sinal para saldos)
+        function formatMinutesToHM(minutes, includeSign = false) {
+            if (includeSign) {
+                return formatMinutes(minutes);
+            }
+            const absMinutes = Math.abs(minutes);
+            const hours = Math.floor(absMinutes / 60);
+            const mins = absMinutes % 60;
+            return hours.toString().padStart(2, '0') + ':' + mins.toString().padStart(2, '0');
         }
         
         // Atualizar contagens do resumo
@@ -2556,7 +2634,7 @@
             rows.forEach(row => {
                 const dayType = row.querySelector('.day-type-select').value;
                 
-                if (dayType === 'normal') {
+                if (dayType === 'normal' || dayType === 'atestado') {
                     const totalCell = row.querySelector('td:nth-child(8)').textContent;
                     const balanceCell = row.querySelector('td:nth-child(9)').textContent;
                     
@@ -2576,8 +2654,8 @@
                 }
             });
             
-            document.getElementById('totalMonthHours').textContent = formatMinutes(totalMinutes);
-            const totalBalance = formatMinutes(totalBalanceMinutes);
+            document.getElementById('totalMonthHours').textContent = formatMinutesToHM(totalMinutes);
+            const totalBalance = formatMinutesToHM(totalBalanceMinutes, true);
             document.getElementById('totalMonthBalance').textContent = totalBalance;
             
             // Atualizar cor do container do saldo
@@ -2700,6 +2778,7 @@
                 const day = row.querySelector('.entrada').getAttribute('data-day');
                 const dayType = row.querySelector('.day-type-select').value;
                 const dayTypeText = row.querySelector('.day-type-text').value || '';
+                const atestadoHours = row.querySelector('.atestado-hours').value || '';
                 const totalCell = row.querySelector('td:nth-child(8)').textContent;
                 const balanceCell = row.querySelector('td:nth-child(9)').textContent;
                 
@@ -2710,6 +2789,7 @@
                     saida: row.querySelector('.saida').value,
                     dayType: dayType,
                     dayTypeText: dayTypeText,
+                    atestadoHours: atestadoHours,
                     total: totalCell,
                     balance: balanceCell
                 };
@@ -2760,7 +2840,7 @@
             const monthName = getMonthName(month);
             
             const data = [];
-            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
+            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
             
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
@@ -2772,6 +2852,7 @@
                     saida: '',
                     dayType: 'normal',
                     dayTypeText: '',
+                    atestadoHours: '',
                     total: '',
                     balance: ''
                 };
@@ -2781,11 +2862,6 @@
                     return time.length === 5 ? time + ':00' : time;
                 };
                 
-                let observacoes = '';
-                if (dayData.dayType !== 'normal') {
-                    observacoes = dayData.dayTypeText || dayData.dayType;
-                }
-                
                 data.push([
                     day,
                     formatTime(dayData.entrada),
@@ -2794,7 +2870,9 @@
                     formatTime(dayData.saida),
                     dayData.total || '',
                     dayData.balance || '',
-                    observacoes
+                    dayData.dayType,
+                    dayData.dayTypeText || '',
+                    dayData.atestadoHours || ''
                 ]);
             }
             
@@ -2802,14 +2880,7 @@
             const ws = XLSX.utils.aoa_to_sheet(data);
             
             const wscols = [
-                {wch: 5},
-                {wch: 10},
-                {wch: 15},
-                {wch: 15},
-                {wch: 10},
-                {wch: 10},
-                {wch: 10},
-                {wch: 30}
+                {wch: 5}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 20}, {wch: 12}
             ];
             ws['!cols'] = wscols;
             
@@ -2879,7 +2950,7 @@
             doc.line(marginLeft, yPos, pageWidth - marginRight, yPos);
             yPos += 5;
             
-            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Status"]];
+            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Atestado (h)"]];
             
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const tableData = [];
@@ -2903,6 +2974,7 @@
                     saida: '',
                     dayType: 'normal',
                     dayTypeText: '',
+                    atestadoHours: '',
                     total: '',
                     balance: ''
                 };
@@ -2922,10 +2994,12 @@
                     totalFaltas++;
                 }
                 
-                if (dayData.dayType === 'normal' && dayData.total) {
-                    const timeStr = dayData.total.replace(/[+-]/, '');
-                    const [hours, minutes] = timeStr.split(':').map(Number);
-                    totalHorasNormais += hours * 60 + minutes;
+                if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                    if (dayData.total) {
+                        const timeStr = dayData.total.replace(/[+-]/, '');
+                        const [hours, minutes] = timeStr.split(':').map(Number);
+                        totalHorasNormais += hours * 60 + minutes;
+                    }
                     
                     if (dayData.balance && dayData.balance.trim() !== '') {
                         const isNegative = dayData.balance.startsWith('-');
@@ -2946,7 +3020,7 @@
                     dayData.saida || '',
                     dayData.total || '',
                     dayData.balance || '',
-                    dayData.dayTypeText || ''
+                    dayData.atestadoHours || ''
                 ]);
             }
             
@@ -3010,7 +3084,7 @@
             showNotification('PDF gerado com sucesso!');
         }
         
-        // Exportar relatório consolidado em PDF
+        // Exportar relatório consolidado em PDF (agora com horas:minutos)
         function exportConsolidatedReportPDF() {
             const employeeId = document.getElementById('exportEmployee').value;
             const month = document.getElementById('exportMonth').value;
@@ -3076,7 +3150,7 @@
             
             yPos += 8;
             doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
-            doc.text(`Período: ${month !== 'all' ? getMonthName(parseInt(month)) + '/' : ''}${year !== 'all' ? year : 'Todos'}` , pageWidth - marginRight, yPos, { align: 'right' });
+            doc.text(`Período: ${month !== 'all' ? getMonthName(parseInt(month)) + '/' : ''}${year !== 'all' ? year : 'Todos'}`, pageWidth - marginRight, yPos, { align: 'right' });
             
             yPos += 8;
             doc.text(`Jornada: ${employee.dailyWorkload || 8}h/dia, ${employee.weeklyWorkload || 44}h/semana`, marginLeft, yPos);
@@ -3140,7 +3214,7 @@
                         balance: ''
                     };
                     
-                    if (dayData.dayType === 'normal') {
+                    if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
                         diasUteisMes++;
                         
                         if (dayData.total && dayData.total.trim() !== '') {
@@ -3167,8 +3241,9 @@
                     }
                 }
                 
-                const horasTrabalhadasFormat = (horasTrabalhadasMes / 60).toFixed(2);
-                const saldoFormat = (saldoMes / 60).toFixed(2);
+                // Formatar horas trabalhadas e saldo como HH:MM (sem sinal para horas, com sinal para saldo)
+                const horasTrabalhadasFormat = formatMinutesToHM(horasTrabalhadasMes);
+                const saldoFormat = formatMinutesToHM(saldoMes, true);
                 
                 tableData.push([
                     `${monthName}/${sheetYear}`,
@@ -3190,8 +3265,8 @@
                 totalGeralFaltas += faltasMes;
             });
             
-            const totalHorasTrabalhadasFormat = (totalGeralHorasTrabalhadas / 60).toFixed(2);
-            const totalSaldoFormat = (totalGeralSaldo / 60).toFixed(2);
+            const totalHorasTrabalhadasFormat = formatMinutesToHM(totalGeralHorasTrabalhadas);
+            const totalSaldoFormat = formatMinutesToHM(totalGeralSaldo, true);
             
             tableData.push([
                 "TOTAL GERAL",
@@ -3240,12 +3315,17 @@
                 doc.setTextColor(0, 0, 0);
                 
                 let analiseY = finalY + 8;
-                doc.text(`Total de Horas Trabalhadas: ${totalHorasTrabalhadasFormat}h`, marginLeft, analiseY);
-                doc.text(`Saldo Total Acumulado: ${totalSaldoFormat}h`, marginLeft + 80, analiseY);
+                doc.text(`Total de Horas Trabalhadas: ${totalHorasTrabalhadasFormat}`, marginLeft, analiseY);
+                doc.text(`Saldo Total Acumulado: ${totalSaldoFormat}`, marginLeft + 80, analiseY);
                 
                 analiseY += 6;
-                const mediaHorasPorDia = totalGeralDiasUteis > 0 ? (totalGeralHorasTrabalhadas / 60 / totalGeralDiasUteis).toFixed(2) : '0.00';
-                doc.text(`Média de Horas por Dia Útil: ${mediaHorasPorDia}h`, marginLeft, analiseY);
+                // Média de horas por dia útil (em minutos, arredondada para o minuto mais próximo)
+                let mediaMinutosPorDia = 0;
+                if (totalGeralDiasUteis > 0) {
+                    mediaMinutosPorDia = Math.round(totalGeralHorasTrabalhadas / totalGeralDiasUteis);
+                }
+                const mediaHorasPorDia = formatMinutesToHM(mediaMinutosPorDia);
+                doc.text(`Média de Horas por Dia Útil: ${mediaHorasPorDia}`, marginLeft, analiseY);
                 
                 analiseY += 6;
                 const percentualSaldo = totalGeralHorasTrabalhadas > 0 ? ((totalGeralSaldo / totalGeralHorasTrabalhadas) * 100).toFixed(2) : '0.00';
@@ -3282,7 +3362,7 @@
             showNotification('Relatório consolidado gerado com sucesso!');
         }
         
-        // Exportar todos os meses em PDF
+        // Exportar todos os meses em PDF (mantido igual, mas usará a função atualizada)
         function exportAllMonthsPDF() {
             const employeeId = document.getElementById('exportEmployee').value;
             
@@ -3343,7 +3423,7 @@
             showNotification(`Gerando ${employeeSheets.length} PDF(s)... Aguarde os downloads.`);
         }
         
-        // Exportar para Excel (todos os dados)
+        // Exportar para Excel (todos os dados) - adaptado para incluir atestado
         function exportToExcel() {
             const employeeId = document.getElementById('exportEmployee').value;
             const month = document.getElementById('exportMonth').value;
@@ -3364,7 +3444,7 @@
                                 const daysData = timesheets[key];
                                 
                                 const data = [];
-                                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
+                                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
                                 
                                 const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
                                 
@@ -3376,6 +3456,7 @@
                                         saida: '',
                                         dayType: 'normal',
                                         dayTypeText: '',
+                                        atestadoHours: '',
                                         total: '',
                                         balance: ''
                                     };
@@ -3385,11 +3466,6 @@
                                         return time.length === 5 ? time + ':00' : time;
                                     };
                                     
-                                    let observacoes = '';
-                                    if (dayData.dayType !== 'normal') {
-                                        observacoes = dayData.dayTypeText || dayData.dayType;
-                                    }
-                                    
                                     data.push([
                                         day,
                                         formatTime(dayData.entrada),
@@ -3398,25 +3474,20 @@
                                         formatTime(dayData.saida),
                                         dayData.total || '',
                                         dayData.balance || '',
-                                        observacoes
+                                        dayData.dayType,
+                                        dayData.dayTypeText || '',
+                                        dayData.atestadoHours || ''
                                     ]);
                                 }
                                 
                                 const ws = XLSX.utils.aoa_to_sheet(data);
                                 
                                 const wscols = [
-                                    {wch: 5},
-                                    {wch: 10},
-                                    {wch: 15},
-                                    {wch: 15},
-                                    {wch: 10},
-                                    {wch: 10},
-                                    {wch: 10},
-                                    {wch: 30}
+                                    {wch: 5}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 20}, {wch: 12}
                                 ];
                                 ws['!cols'] = wscols;
                                 
-                                const sheetName = `${employee.name.substring(0, 20)}_${monthName}_${sheetYear}`.substring(0, 31);
+                                const sheetName = `${employee.name.substring(0, 15)}_${monthName}_${sheetYear}`.substring(0, 31);
                                 XLSX.utils.book_append_sheet(wb, ws, sheetName);
                             }
                         }
@@ -3435,7 +3506,7 @@
                             const daysData = timesheets[key];
                             
                             const data = [];
-                            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Observações"]);
+                            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
                             
                             const daysInMonth = new Date(sheetYear, parseInt(sheetMonth) + 1, 0).getDate();
                             
@@ -3447,6 +3518,7 @@
                                     saida: '',
                                     dayType: 'normal',
                                     dayTypeText: '',
+                                    atestadoHours: '',
                                     total: '',
                                     balance: ''
                                 };
@@ -3456,11 +3528,6 @@
                                     return time.length === 5 ? time + ':00' : time;
                                 };
                                 
-                                let observacoes = '';
-                                if (dayData.dayType !== 'normal') {
-                                    observacoes = dayData.dayTypeText || dayData.dayType;
-                                }
-                                
                                 data.push([
                                     day,
                                     formatTime(dayData.entrada),
@@ -3469,21 +3536,16 @@
                                     formatTime(dayData.saida),
                                     dayData.total || '',
                                     dayData.balance || '',
-                                    observacoes
+                                    dayData.dayType,
+                                    dayData.dayTypeText || '',
+                                    dayData.atestadoHours || ''
                                 ]);
                             }
                             
                             const ws = XLSX.utils.aoa_to_sheet(data);
                             
                             const wscols = [
-                                {wch: 5},
-                                {wch: 10},
-                                {wch: 15},
-                                {wch: 15},
-                                {wch: 10},
-                                {wch: 10},
-                                {wch: 10},
-                                {wch: 30}
+                                {wch: 5}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 20}, {wch: 12}
                             ];
                             ws['!cols'] = wscols;
                             
@@ -3506,7 +3568,7 @@
             showNotification('Dados exportados com sucesso!');
         }
         
-        // Importar do Excel
+        // Importar do Excel (adaptado para ler atestado, se disponível)
         function importFromExcel() {
             const employeeId = document.getElementById('importEmployee').value;
             const fileInput = document.getElementById('importFile');
@@ -3555,20 +3617,17 @@
                             
                             const formatTimeFromExcel = (excelTime) => {
                                 if (!excelTime) return '';
-                                
                                 if (typeof excelTime === 'number') {
                                     const totalSeconds = Math.floor(excelTime * 24 * 60 * 60);
                                     const hours = Math.floor(totalSeconds / 3600);
                                     const minutes = Math.floor((totalSeconds % 3600) / 60);
                                     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                                 }
-                                
                                 const timeStr = String(excelTime);
                                 if (timeStr.includes(':')) {
                                     const parts = timeStr.split(':');
                                     return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
                                 }
-                                
                                 return '';
                             };
                             
@@ -3578,22 +3637,19 @@
                                 voltaIntervalo: formatTimeFromExcel(row[3]),
                                 saida: formatTimeFromExcel(row[4]),
                                 dayType: 'normal',
-                                dayTypeText: row[5] || '',
+                                dayTypeText: row[7] || '', // Tipo (coluna H)
+                                atestadoHours: row[9] || '', // Horas Atestado (coluna J)
                                 total: '',
                                 balance: ''
                             };
                             
-                            if (row[5]) {
-                                const obs = row[5].toLowerCase();
-                                if (obs.includes('folga')) dayData.dayType = 'folga';
-                                else if (obs.includes('feriado')) dayData.dayType = 'feriado';
-                                else if (obs.includes('atestado')) dayData.dayType = 'atestado';
-                                else if (obs.includes('falta')) dayData.dayType = 'falta';
-                                else if (obs.includes('férias')) dayData.dayType = 'ferias';
+                            // Se houver tipo na coluna H, usar
+                            if (row[7]) {
+                                dayData.dayType = row[7].toLowerCase();
                             }
                             
                             // Calcular total e saldo se houver horários
-                            if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                            if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
                                 const employee = employees.find(emp => emp.id === employeeId);
                                 if (employee) {
                                     const currentDate = new Date(year, month, day);
@@ -3645,7 +3701,7 @@
                 timesheets,
                 holidays,
                 exportDate: new Date().toISOString(),
-                version: '4.1'
+                version: '4.2' // versão com atestado
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -3661,7 +3717,7 @@
             showNotification('Backup exportado com sucesso!');
         }
         
-        // Restaurar backup COM MERGE melhorado
+        // Restaurar backup COM MERGE melhorado (compatível com nova estrutura)
         function importBackupMerge() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -3720,14 +3776,15 @@
                                 timesheets[key] = backupData.timesheets[key];
                                 addedTimesheets++;
                                 
-                                // Garantir que os cálculos estejam corretos
+                                // Garantir que os cálculos estejam corretos e adicionar atestadoHours se faltar
                                 const [empId, sheetYear, sheetMonth] = key.split('-');
                                 const employee = employees.find(emp => emp.id === empId);
                                 if (employee) {
                                     const daysData = timesheets[key];
                                     Object.keys(daysData).forEach(day => {
                                         const dayData = daysData[day];
-                                        if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                                        if (!dayData.atestadoHours) dayData.atestadoHours = '';
+                                        if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
                                             const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
                                             const dayOfWeek = currentDate.getDay();
                                             const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
@@ -3757,6 +3814,7 @@
                                         // Se o backup tem tipo especial e o local tem normal, usar o backup
                                         existingDays[day].dayType = backupDay.dayType;
                                         existingDays[day].dayTypeText = backupDay.dayTypeText;
+                                        existingDays[day].atestadoHours = backupDay.atestadoHours || '';
                                         daysUpdated++;
                                     }
                                 });
@@ -3770,7 +3828,8 @@
                                     if (employee) {
                                         Object.keys(existingDays).forEach(day => {
                                             const dayData = existingDays[day];
-                                            if (dayData.entrada && dayData.saida && dayData.dayType === 'normal') {
+                                            if (!dayData.atestadoHours) dayData.atestadoHours = '';
+                                            if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
                                                 const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
                                                 const dayOfWeek = currentDate.getDay();
                                                 const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
