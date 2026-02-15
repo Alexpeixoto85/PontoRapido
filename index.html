@@ -2143,7 +2143,7 @@
             }, AUTO_SAVE_DELAY);
         }
 
-        // --- Funções de salvamento e manipulação de dados (originais) ---
+        // --- Funções de salvamento e manipulação de dados (corrigidas) ---
         async function saveTimesheet() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
@@ -2154,26 +2154,39 @@
             const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
             const daysData = {};
             const rows = document.querySelectorAll('#timesheetBody tr');
+            
+            // Verifica se há linhas e se não é a linha de estado vazio
+            if (rows.length === 0 || rows[0].querySelector('.empty-state')) {
+                showNotification('Nenhum dado para salvar!', 'warning');
+                return;
+            }
+            
             rows.forEach(row => {
-                const day = row.querySelector('.entrada').getAttribute('data-day');
-                const dayType = row.querySelector('.day-type-select').value;
-                const dayTypeText = row.querySelector('.day-type-text').value || '';
-                const atestadoHours = row.querySelector('.atestado-hours').value || '';
+                const dayInput = row.querySelector('.entrada');
+                if (!dayInput) return;
+                const day = dayInput.getAttribute('data-day');
+                if (!day) return;
                 daysData[day] = {
-                    entrada: row.querySelector('.entrada').value,
+                    entrada: dayInput.value,
                     saidaIntervalo: row.querySelector('.saida-intervalo').value,
                     voltaIntervalo: row.querySelector('.volta-intervalo').value,
                     saida: row.querySelector('.saida').value,
-                    dayType: dayType,
-                    dayTypeText: dayTypeText,
-                    atestadoHours: atestadoHours,
+                    dayType: row.querySelector('.day-type-select').value,
+                    dayTypeText: row.querySelector('.day-type-text').value || '',
+                    atestadoHours: row.querySelector('.atestado-hours').value || '',
                     total: row.querySelector('td:nth-child(8)').textContent,
                     balance: row.querySelector('td:nth-child(9)').textContent
                 };
             });
-            await saveTimesheet(timesheetKey, daysData);
-            timesheets[timesheetKey] = daysData;
-            showNotification('Registros do mês salvos com sucesso!');
+            
+            try {
+                await saveTimesheet(timesheetKey, daysData);
+                timesheets[timesheetKey] = daysData;
+                showNotification('Registros do mês salvos com sucesso!');
+            } catch (error) {
+                console.error('Erro ao salvar:', error);
+                showNotification('Erro ao salvar: ' + error.message, 'error');
+            }
         }
 
         async function clearTimesheet() {
@@ -2659,236 +2672,281 @@
             if (currentEmployeeId) generateCalendar();
         }
 
-        // --- Funções de exportação/importação (originais, mantidas) ---
+        // --- Funções de exportação/importação (originais, com tratamento de erros) ---
         function exportCurrentTimesheet() {
-            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
-            const month = parseInt(document.getElementById('monthSelect').value);
-            const year = parseInt(document.getElementById('yearSelect').value);
-            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
-            const savedData = timesheets[timesheetKey];
-            if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
-            const employee = employees.find(emp => emp.id === currentEmployeeId);
-            const monthName = getMonthName(month);
-            const totalMonthHours = document.getElementById('totalMonthHours').textContent;
-            const totalMonthBalance = document.getElementById('totalMonthBalance').textContent;
-            const totalFolgas = document.getElementById('totalFolgas').textContent;
-            const totalFeriados = document.getElementById('totalFeriados').textContent;
-            const totalAtestados = document.getElementById('totalAtestados').textContent;
-            const totalFaltas = document.getElementById('totalFaltas').textContent;
-            const data = [];
-            data.push([`Registro de Ponto - ${employee.name}`, ...Array(9).fill('')]);
-            data.push([`Mês/Ano: ${monthName}/${year}`, ...Array(9).fill('')]);
-            data.push([]);
-            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
-                const formatTime = (time) => !time ? '' : time.length === 5 ? time + ':00' : time;
-                data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total || '', dayData.balance || '', dayData.dayType, dayData.dayTypeText || '', dayData.atestadoHours || '']);
+            try {
+                if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+                const month = parseInt(document.getElementById('monthSelect').value);
+                const year = parseInt(document.getElementById('yearSelect').value);
+                const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+                const savedData = timesheets[timesheetKey];
+                if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
+                const employee = employees.find(emp => emp.id === currentEmployeeId);
+                const monthName = getMonthName(month);
+                const totalMonthHours = document.getElementById('totalMonthHours').textContent;
+                const totalMonthBalance = document.getElementById('totalMonthBalance').textContent;
+                const totalFolgas = document.getElementById('totalFolgas').textContent;
+                const totalFeriados = document.getElementById('totalFeriados').textContent;
+                const totalAtestados = document.getElementById('totalAtestados').textContent;
+                const totalFaltas = document.getElementById('totalFaltas').textContent;
+                const data = [];
+                data.push([`Registro de Ponto - ${employee.name}`, ...Array(9).fill('')]);
+                data.push([`Mês/Ano: ${monthName}/${year}`, ...Array(9).fill('')]);
+                data.push([]);
+                data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
+                    const formatTime = (time) => !time ? '' : time.length === 5 ? time + ':00' : time;
+                    data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total || '', dayData.balance || '', dayData.dayType, dayData.dayTypeText || '', dayData.atestadoHours || '']);
+                }
+                data.push([]);
+                data.push(["Total Horas Normais:", "", "", "", "", totalMonthHours, "", "", "", ""]);
+                data.push(["Saldo do Mês:", "", "", "", "", totalMonthBalance, "", "", "", ""]);
+                data.push(["Folgas:", totalFolgas, "Feriados:", totalFeriados, "Atestados:", totalAtestados, "Faltas:", totalFaltas, "", ""]);
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wscols = [{wch:6},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
+                ws['!cols'] = wscols;
+                if (!ws['!merges']) ws['!merges'] = [];
+                ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } });
+                ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } });
+                XLSX.utils.book_append_sheet(wb, ws, "Ponto Mensal");
+                const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                showNotification('Arquivo Excel exportado com layout moderno!');
+            } catch (error) {
+                console.error('Erro ao exportar Excel:', error);
+                showNotification('Erro ao exportar Excel: ' + error.message, 'error');
             }
-            data.push([]);
-            data.push(["Total Horas Normais:", "", "", "", "", totalMonthHours, "", "", "", ""]);
-            data.push(["Saldo do Mês:", "", "", "", "", totalMonthBalance, "", "", "", ""]);
-            data.push(["Folgas:", totalFolgas, "Feriados:", totalFeriados, "Atestados:", totalAtestados, "Faltas:", totalFaltas, "", ""]);
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            const wscols = [{wch:6},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
-            ws['!cols'] = wscols;
-            if (!ws['!merges']) ws['!merges'] = [];
-            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } });
-            ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } });
-            XLSX.utils.book_append_sheet(wb, ws, "Ponto Mensal");
-            const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-            showNotification('Arquivo Excel exportado com layout moderno!');
         }
 
         function exportCurrentTimesheetPDF() {
-            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
-            const month = parseInt(document.getElementById('monthSelect').value);
-            const year = parseInt(document.getElementById('yearSelect').value);
-            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
-            const savedData = timesheets[timesheetKey];
-            if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
-            const employee = employees.find(emp => emp.id === currentEmployeeId);
-            const monthName = getMonthName(month);
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('l', 'mm', 'a4');
-            const marginLeft = 15, marginRight = 15, marginTop = 20;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('ESPELHO DE PONTO MENSAL', pageWidth/2, marginTop, { align: 'center' });
-            doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
-            doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
-            doc.text(`Mês/Ano: ${monthName}/${year}`, pageWidth-marginRight, yPos, { align: 'right' });
-            yPos += 8; doc.text(`Matrícula: ${employee.id}`, marginLeft, yPos);
-            let workloadText = `Jornada: ${employee.dailyWorkload || 8}h/dia`;
-            if (employee.dailyWorkloads) workloadText += ' (Personalizada por dia)';
-            doc.text(workloadText, pageWidth-marginRight, yPos, { align: 'right' });
-            yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
-            doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align: 'right' });
-            yPos += 10; doc.setDrawColor(200,200,200); doc.line(marginLeft, yPos, pageWidth-marginRight, yPos); yPos += 5;
-            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Atestado (h)"]];
-            const daysInMonth = new Date(year, month+1, 0).getDate();
-            const tableData = [];
-            let totalHorasNormais = 0, totalSaldo = 0, totalFolgas = 0, totalFeriados = 0, totalAtestados = 0, totalFaltas = 0;
-            for (let day = 1; day <= daysInMonth; day++) {
-                const currentDate = new Date(year, month, day);
-                const dayName = getDayName(currentDate.getDay());
-                const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
-                let tipoDia = 'Normal';
-                if (dayData.dayType === 'folga') { tipoDia = 'Folga'; totalFolgas++; }
-                else if (dayData.dayType === 'feriado') { tipoDia = 'Feriado'; totalFeriados++; }
-                else if (dayData.dayType === 'atestado') { tipoDia = 'Atestado'; totalAtestados++; }
-                else if (dayData.dayType === 'falta') { tipoDia = 'Falta'; totalFaltas++; }
-                if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
-                    if (dayData.total) {
-                        const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
-                        totalHorasNormais += hours*60 + minutes;
+            try {
+                if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+                const month = parseInt(document.getElementById('monthSelect').value);
+                const year = parseInt(document.getElementById('yearSelect').value);
+                const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+                const savedData = timesheets[timesheetKey];
+                if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
+                const employee = employees.find(emp => emp.id === currentEmployeeId);
+                const monthName = getMonthName(month);
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('l', 'mm', 'a4');
+                const marginLeft = 15, marginRight = 15, marginTop = 20;
+                const pageWidth = doc.internal.pageSize.getWidth();
+                doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('ESPELHO DE PONTO MENSAL', pageWidth/2, marginTop, { align: 'center' });
+                doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
+                doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
+                doc.text(`Mês/Ano: ${monthName}/${year}`, pageWidth-marginRight, yPos, { align: 'right' });
+                yPos += 8; doc.text(`Matrícula: ${employee.id}`, marginLeft, yPos);
+                let workloadText = `Jornada: ${employee.dailyWorkload || 8}h/dia`;
+                if (employee.dailyWorkloads) workloadText += ' (Personalizada por dia)';
+                doc.text(workloadText, pageWidth-marginRight, yPos, { align: 'right' });
+                yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
+                doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align: 'right' });
+                yPos += 10; doc.setDrawColor(200,200,200); doc.line(marginLeft, yPos, pageWidth-marginRight, yPos); yPos += 5;
+                const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Atestado (h)"]];
+                const daysInMonth = new Date(year, month+1, 0).getDate();
+                const tableData = [];
+                let totalHorasNormais = 0, totalSaldo = 0, totalFolgas = 0, totalFeriados = 0, totalAtestados = 0, totalFaltas = 0;
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const currentDate = new Date(year, month, day);
+                    const dayName = getDayName(currentDate.getDay());
+                    const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
+                    let tipoDia = 'Normal';
+                    if (dayData.dayType === 'folga') { tipoDia = 'Folga'; totalFolgas++; }
+                    else if (dayData.dayType === 'feriado') { tipoDia = 'Feriado'; totalFeriados++; }
+                    else if (dayData.dayType === 'atestado') { tipoDia = 'Atestado'; totalAtestados++; }
+                    else if (dayData.dayType === 'falta') { tipoDia = 'Falta'; totalFaltas++; }
+                    if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                        if (dayData.total) {
+                            const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
+                            totalHorasNormais += hours*60 + minutes;
+                        }
+                        if (dayData.balance && dayData.balance.trim() !== '') {
+                            const isNegative = dayData.balance.startsWith('-');
+                            const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
+                            totalSaldo += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
+                        }
                     }
-                    if (dayData.balance && dayData.balance.trim() !== '') {
-                        const isNegative = dayData.balance.startsWith('-');
-                        const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
-                        totalSaldo += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
-                    }
+                    tableData.push([day.toString(), dayName, tipoDia, dayData.entrada||'', dayData.saidaIntervalo||'', dayData.voltaIntervalo||'', dayData.saida||'', dayData.total||'', dayData.balance||'', dayData.atestadoHours||'']);
                 }
-                tableData.push([day.toString(), dayName, tipoDia, dayData.entrada||'', dayData.saidaIntervalo||'', dayData.voltaIntervalo||'', dayData.saida||'', dayData.total||'', dayData.balance||'', dayData.atestadoHours||'']);
+                doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:8, cellPadding:2 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
+                const finalY = doc.lastAutoTable.finalY + 10;
+                doc.setFontSize(12); doc.setTextColor(40,53,147); doc.text('RESUMO DO MÊS', marginLeft, finalY);
+                doc.setFontSize(10); doc.setTextColor(0,0,0);
+                const formatMinutesToHours = (minutes) => { const sign = minutes<0?'-':'+'; const abs = Math.abs(minutes); const h = Math.floor(abs/60); const m = abs%60; return `${sign}${h}h ${m}m`; };
+                let resumoY = finalY + 8;
+                doc.text(`Horas Trabalhadas: ${formatMinutesToHours(totalHorasNormais)}`, marginLeft, resumoY);
+                doc.text(`Saldo Total: ${formatMinutesToHours(totalSaldo)}`, marginLeft+60, resumoY);
+                resumoY += 6; doc.text(`Folgas: ${totalFolgas} dias`, marginLeft, resumoY); doc.text(`Feriados: ${totalFeriados} dias`, marginLeft+60, resumoY);
+                resumoY += 6; doc.text(`Atestados: ${totalAtestados} dias`, marginLeft, resumoY); doc.text(`Faltas: ${totalFaltas} dias`, marginLeft+60, resumoY);
+                const footerY = doc.internal.pageSize.getHeight() - 20;
+                doc.setFontSize(8); doc.setTextColor(128,128,128); doc.text('Sistema de Ponto Completo - Documento gerado automaticamente', pageWidth/2, footerY, { align:'center' });
+                const assinaturaY = footerY - 20;
+                doc.setFontSize(10); doc.setTextColor(0,0,0); doc.line(marginLeft, assinaturaY, marginLeft+60, assinaturaY); doc.line(pageWidth-marginRight-60, assinaturaY, pageWidth-marginRight, assinaturaY);
+                doc.text('Assinatura do Funcionário', marginLeft+30, assinaturaY+5, { align:'center' }); doc.text('Assinatura do Responsável', pageWidth-marginRight-30, assinaturaY+5, { align:'center' });
+                const fileName = `Espelho_Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.pdf`;
+                doc.save(fileName);
+                showNotification('PDF gerado com sucesso!');
+            } catch (error) {
+                console.error('Erro ao exportar PDF:', error);
+                showNotification('Erro ao exportar PDF: ' + error.message, 'error');
             }
-            doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:8, cellPadding:2 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
-            const finalY = doc.lastAutoTable.finalY + 10;
-            doc.setFontSize(12); doc.setTextColor(40,53,147); doc.text('RESUMO DO MÊS', marginLeft, finalY);
-            doc.setFontSize(10); doc.setTextColor(0,0,0);
-            const formatMinutesToHours = (minutes) => { const sign = minutes<0?'-':'+'; const abs = Math.abs(minutes); const h = Math.floor(abs/60); const m = abs%60; return `${sign}${h}h ${m}m`; };
-            let resumoY = finalY + 8;
-            doc.text(`Horas Trabalhadas: ${formatMinutesToHours(totalHorasNormais)}`, marginLeft, resumoY);
-            doc.text(`Saldo Total: ${formatMinutesToHours(totalSaldo)}`, marginLeft+60, resumoY);
-            resumoY += 6; doc.text(`Folgas: ${totalFolgas} dias`, marginLeft, resumoY); doc.text(`Feriados: ${totalFeriados} dias`, marginLeft+60, resumoY);
-            resumoY += 6; doc.text(`Atestados: ${totalAtestados} dias`, marginLeft, resumoY); doc.text(`Faltas: ${totalFaltas} dias`, marginLeft+60, resumoY);
-            const footerY = doc.internal.pageSize.getHeight() - 20;
-            doc.setFontSize(8); doc.setTextColor(128,128,128); doc.text('Sistema de Ponto Completo - Documento gerado automaticamente', pageWidth/2, footerY, { align:'center' });
-            const assinaturaY = footerY - 20;
-            doc.setFontSize(10); doc.setTextColor(0,0,0); doc.line(marginLeft, assinaturaY, marginLeft+60, assinaturaY); doc.line(pageWidth-marginRight-60, assinaturaY, pageWidth-marginRight, assinaturaY);
-            doc.text('Assinatura do Funcionário', marginLeft+30, assinaturaY+5, { align:'center' }); doc.text('Assinatura do Responsável', pageWidth-marginRight-30, assinaturaY+5, { align:'center' });
-            const fileName = `Espelho_Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.pdf`;
-            doc.save(fileName);
-            showNotification('PDF gerado com sucesso!');
         }
 
         function exportConsolidatedReportPDF() {
-            const employeeId = document.getElementById('exportEmployee').value;
-            const month = document.getElementById('exportMonth').value;
-            const year = document.getElementById('exportYear').value;
-            if (employeeId === 'all') { showNotification('Selecione um funcionário específico para o relatório consolidado!', 'error'); return; }
-            const employee = employees.find(emp => emp.id === employeeId);
-            if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
-            const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
-            if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
-            employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
-            let filteredSheets = employeeSheets;
-            if (month !== 'all' || year !== 'all') {
-                filteredSheets = employeeSheets.filter(key => { const [id,sY,sM]=key.split('-'); return (month==='all' || sM===month) && (year==='all' || sY===year); });
-            }
-            if (filteredSheets.length === 0) { showNotification('Nenhum registro encontrado para os filtros selecionados!', 'warning'); return; }
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const marginLeft = 15, marginRight = 15, marginTop = 20;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('RELATÓRIO CONSOLIDADO DE PONTO', pageWidth/2, marginTop, { align:'center' });
-            doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
-            doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
-            doc.text(`Matrícula: ${employee.id}`, pageWidth-marginRight, yPos, { align:'right' });
-            yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
-            doc.text(`Período: ${month!=='all'?getMonthName(parseInt(month))+'/':''}${year!=='all'?year:'Todos'}`, pageWidth-marginRight, yPos, { align:'right' });
-            yPos += 8; doc.text(`Jornada: ${employee.dailyWorkload||8}h/dia, ${employee.weeklyWorkload||44}h/semana`, marginLeft, yPos);
-            doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align:'right' });
-            yPos += 5;
-            const headers = [["Mês/Ano", "Dias Úteis", "Horas Trabalhadas", "Saldo Total", "Folgas", "Feriados", "Atestados", "Faltas"]];
-            const tableData = [];
-            let totalGeralHorasTrabalhadas = 0, totalGeralSaldo = 0, totalGeralDiasUteis = 0, totalGeralFolgas = 0, totalGeralFeriados = 0, totalGeralAtestados = 0, totalGeralFaltas = 0;
-            filteredSheets.forEach(key => {
-                const [empId, sheetYear, sheetMonth] = key.split('-');
-                const monthName = getMonthName(parseInt(sheetMonth));
-                const daysData = timesheets[key];
-                let horasTrabalhadasMes = 0, saldoMes = 0, diasUteisMes = 0, folgasMes = 0, feriadosMes = 0, atestadosMes = 0, faltasMes = 0;
-                const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
-                for (let day = 1; day <= daysInMonth; day++) {
-                    const dayData = daysData && daysData[day] ? daysData[day] : { dayType:'normal', total:'', balance:'' };
-                    if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
-                        diasUteisMes++;
-                        if (dayData.total && dayData.total.trim()!=='') {
-                            const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
-                            horasTrabalhadasMes += hours*60 + minutes;
-                        }
-                        if (dayData.balance && dayData.balance.trim()!=='') {
-                            const isNegative = dayData.balance.startsWith('-');
-                            const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
-                            saldoMes += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
-                        }
-                    } else if (dayData.dayType === 'folga') folgasMes++;
-                    else if (dayData.dayType === 'feriado') feriadosMes++;
-                    else if (dayData.dayType === 'atestado') atestadosMes++;
-                    else if (dayData.dayType === 'falta') faltasMes++;
+            try {
+                const employeeId = document.getElementById('exportEmployee').value;
+                const month = document.getElementById('exportMonth').value;
+                const year = document.getElementById('exportYear').value;
+                if (employeeId === 'all') { showNotification('Selecione um funcionário específico para o relatório consolidado!', 'error'); return; }
+                const employee = employees.find(emp => emp.id === employeeId);
+                if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
+                const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
+                if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
+                employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
+                let filteredSheets = employeeSheets;
+                if (month !== 'all' || year !== 'all') {
+                    filteredSheets = employeeSheets.filter(key => { const [id,sY,sM]=key.split('-'); return (month==='all' || sM===month) && (year==='all' || sY===year); });
                 }
-                tableData.push([`${monthName}/${sheetYear}`, diasUteisMes.toString(), formatMinutesToHM(horasTrabalhadasMes), formatMinutesToHM(saldoMes, true), folgasMes.toString(), feriadosMes.toString(), atestadosMes.toString(), faltasMes.toString()]);
-                totalGeralHorasTrabalhadas += horasTrabalhadasMes;
-                totalGeralSaldo += saldoMes;
-                totalGeralDiasUteis += diasUteisMes;
-                totalGeralFolgas += folgasMes;
-                totalGeralFeriados += feriadosMes;
-                totalGeralAtestados += atestadosMes;
-                totalGeralFaltas += faltasMes;
-            });
-            tableData.push(["TOTAL GERAL", totalGeralDiasUteis.toString(), formatMinutesToHM(totalGeralHorasTrabalhadas), formatMinutesToHM(totalGeralSaldo, true), totalGeralFolgas.toString(), totalGeralFeriados.toString(), totalGeralAtestados.toString(), totalGeralFaltas.toString()]);
-            doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:9 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
-            const fileName = `Relatorio_Consolidado_${employee.name.replace(/\s+/g, '_')}_${month!=='all'?getMonthName(parseInt(month)):''}${year!=='all'?year:''}.pdf`;
-            doc.save(fileName);
-            showNotification('Relatório consolidado gerado com sucesso!');
+                if (filteredSheets.length === 0) { showNotification('Nenhum registro encontrado para os filtros selecionados!', 'warning'); return; }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const marginLeft = 15, marginRight = 15, marginTop = 20;
+                const pageWidth = doc.internal.pageSize.getWidth();
+                doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('RELATÓRIO CONSOLIDADO DE PONTO', pageWidth/2, marginTop, { align:'center' });
+                doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
+                doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
+                doc.text(`Matrícula: ${employee.id}`, pageWidth-marginRight, yPos, { align:'right' });
+                yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
+                doc.text(`Período: ${month!=='all'?getMonthName(parseInt(month))+'/':''}${year!=='all'?year:'Todos'}`, pageWidth-marginRight, yPos, { align:'right' });
+                yPos += 8; doc.text(`Jornada: ${employee.dailyWorkload||8}h/dia, ${employee.weeklyWorkload||44}h/semana`, marginLeft, yPos);
+                doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align:'right' });
+                yPos += 5;
+                const headers = [["Mês/Ano", "Dias Úteis", "Horas Trabalhadas", "Saldo Total", "Folgas", "Feriados", "Atestados", "Faltas"]];
+                const tableData = [];
+                let totalGeralHorasTrabalhadas = 0, totalGeralSaldo = 0, totalGeralDiasUteis = 0, totalGeralFolgas = 0, totalGeralFeriados = 0, totalGeralAtestados = 0, totalGeralFaltas = 0;
+                filteredSheets.forEach(key => {
+                    const [empId, sheetYear, sheetMonth] = key.split('-');
+                    const monthName = getMonthName(parseInt(sheetMonth));
+                    const daysData = timesheets[key];
+                    let horasTrabalhadasMes = 0, saldoMes = 0, diasUteisMes = 0, folgasMes = 0, feriadosMes = 0, atestadosMes = 0, faltasMes = 0;
+                    const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dayData = daysData && daysData[day] ? daysData[day] : { dayType:'normal', total:'', balance:'' };
+                        if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                            diasUteisMes++;
+                            if (dayData.total && dayData.total.trim()!=='') {
+                                const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
+                                horasTrabalhadasMes += hours*60 + minutes;
+                            }
+                            if (dayData.balance && dayData.balance.trim()!=='') {
+                                const isNegative = dayData.balance.startsWith('-');
+                                const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
+                                saldoMes += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
+                            }
+                        } else if (dayData.dayType === 'folga') folgasMes++;
+                        else if (dayData.dayType === 'feriado') feriadosMes++;
+                        else if (dayData.dayType === 'atestado') atestadosMes++;
+                        else if (dayData.dayType === 'falta') faltasMes++;
+                    }
+                    tableData.push([`${monthName}/${sheetYear}`, diasUteisMes.toString(), formatMinutesToHM(horasTrabalhadasMes), formatMinutesToHM(saldoMes, true), folgasMes.toString(), feriadosMes.toString(), atestadosMes.toString(), faltasMes.toString()]);
+                    totalGeralHorasTrabalhadas += horasTrabalhadasMes;
+                    totalGeralSaldo += saldoMes;
+                    totalGeralDiasUteis += diasUteisMes;
+                    totalGeralFolgas += folgasMes;
+                    totalGeralFeriados += feriadosMes;
+                    totalGeralAtestados += atestadosMes;
+                    totalGeralFaltas += faltasMes;
+                });
+                tableData.push(["TOTAL GERAL", totalGeralDiasUteis.toString(), formatMinutesToHM(totalGeralHorasTrabalhadas), formatMinutesToHM(totalGeralSaldo, true), totalGeralFolgas.toString(), totalGeralFeriados.toString(), totalGeralAtestados.toString(), totalGeralFaltas.toString()]);
+                doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:9 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
+                const fileName = `Relatorio_Consolidado_${employee.name.replace(/\s+/g, '_')}_${month!=='all'?getMonthName(parseInt(month)):''}${year!=='all'?year:''}.pdf`;
+                doc.save(fileName);
+                showNotification('Relatório consolidado gerado com sucesso!');
+            } catch (error) {
+                console.error('Erro ao gerar relatório consolidado PDF:', error);
+                showNotification('Erro ao gerar relatório: ' + error.message, 'error');
+            }
         }
 
         function exportAllMonthsPDF() {
-            const employeeId = document.getElementById('exportEmployee').value;
-            if (employeeId === 'all') { showNotification('Selecione um funcionário específico!', 'error'); return; }
-            const employee = employees.find(emp => emp.id === employeeId);
-            if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
-            const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
-            if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
-            employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
-            employeeSheets.forEach((key, index) => {
-                const [empId, year, month] = key.split('-');
-                const originalEmployeeId = currentEmployeeId;
-                const originalMonth = currentMonth;
-                const originalYear = currentYear;
-                currentEmployeeId = employeeId;
-                currentMonth = parseInt(month);
-                currentYear = parseInt(year);
-                setTimeout(() => {
-                    exportCurrentTimesheetPDF();
-                    if (index === employeeSheets.length - 1) {
-                        currentEmployeeId = originalEmployeeId;
-                        currentMonth = originalMonth;
-                        currentYear = originalYear;
-                        if (originalEmployeeId) {
-                            document.getElementById('monthSelect').value = originalMonth;
-                            document.getElementById('yearSelect').value = originalYear;
-                            document.getElementById('employeeSelect').value = originalEmployeeId;
-                            generateCalendar();
+            try {
+                const employeeId = document.getElementById('exportEmployee').value;
+                if (employeeId === 'all') { showNotification('Selecione um funcionário específico!', 'error'); return; }
+                const employee = employees.find(emp => emp.id === employeeId);
+                if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
+                const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
+                if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
+                employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
+                employeeSheets.forEach((key, index) => {
+                    const [empId, year, month] = key.split('-');
+                    const originalEmployeeId = currentEmployeeId;
+                    const originalMonth = currentMonth;
+                    const originalYear = currentYear;
+                    currentEmployeeId = employeeId;
+                    currentMonth = parseInt(month);
+                    currentYear = parseInt(year);
+                    setTimeout(() => {
+                        exportCurrentTimesheetPDF();
+                        if (index === employeeSheets.length - 1) {
+                            currentEmployeeId = originalEmployeeId;
+                            currentMonth = originalMonth;
+                            currentYear = originalYear;
+                            if (originalEmployeeId) {
+                                document.getElementById('monthSelect').value = originalMonth;
+                                document.getElementById('yearSelect').value = originalYear;
+                                document.getElementById('employeeSelect').value = originalEmployeeId;
+                                generateCalendar();
+                            }
                         }
-                    }
-                }, index * 1000);
-            });
-            showNotification(`Gerando ${employeeSheets.length} PDF(s)... Aguarde os downloads.`);
+                    }, index * 1000);
+                });
+                showNotification(`Gerando ${employeeSheets.length} PDF(s)... Aguarde os downloads.`);
+            } catch (error) {
+                console.error('Erro ao exportar todos os meses PDF:', error);
+                showNotification('Erro ao exportar: ' + error.message, 'error');
+            }
         }
 
         function exportToExcel() {
-            const employeeId = document.getElementById('exportEmployee').value;
-            const month = document.getElementById('exportMonth').value;
-            const year = document.getElementById('exportYear').value;
-            const wb = XLSX.utils.book_new();
-            if (employeeId === 'all') {
-                employees.forEach(employee => {
+            try {
+                const employeeId = document.getElementById('exportEmployee').value;
+                const month = document.getElementById('exportMonth').value;
+                const year = document.getElementById('exportYear').value;
+                const wb = XLSX.utils.book_new();
+                if (employeeId === 'all') {
+                    employees.forEach(employee => {
+                        Object.keys(timesheets).forEach(key => {
+                            if (key.startsWith(employee.id)) {
+                                const [empId, sheetYear, sheetMonth] = key.split('-');
+                                if ((month === 'all' || sheetMonth === month) && (year === 'all' || sheetYear === year)) {
+                                    const monthName = getMonthName(parseInt(sheetMonth));
+                                    const daysData = timesheets[key];
+                                    const data = [["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]];
+                                    const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
+                                    for (let day = 1; day <= daysInMonth; day++) {
+                                        const dayData = daysData[day] || { entrada:'', saidaIntervalo:'', voltaIntervalo:'', saida:'', dayType:'normal', dayTypeText:'', atestadoHours:'', total:'', balance:'' };
+                                        const formatTime = (time) => !time ? '' : time.length === 5 ? time+':00' : time;
+                                        data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total||'', dayData.balance||'', dayData.dayType, dayData.dayTypeText||'', dayData.atestadoHours||'']);
+                                    }
+                                    const ws = XLSX.utils.aoa_to_sheet(data);
+                                    const wscols = [{wch:5},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
+                                    ws['!cols'] = wscols;
+                                    const sheetName = `${employee.name.substring(0,15)}_${monthName}_${sheetYear}`.substring(0,31);
+                                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                                }
+                            }
+                        });
+                    });
+                } else {
                     Object.keys(timesheets).forEach(key => {
-                        if (key.startsWith(employee.id)) {
+                        if (key.startsWith(employeeId)) {
                             const [empId, sheetYear, sheetMonth] = key.split('-');
                             if ((month === 'all' || sheetMonth === month) && (year === 'all' || sheetYear === year)) {
+                                const employee = employees.find(emp => emp.id === empId);
                                 const monthName = getMonthName(parseInt(sheetMonth));
                                 const daysData = timesheets[key];
                                 const data = [["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]];
@@ -2901,242 +2959,241 @@
                                 const ws = XLSX.utils.aoa_to_sheet(data);
                                 const wscols = [{wch:5},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
                                 ws['!cols'] = wscols;
-                                const sheetName = `${employee.name.substring(0,15)}_${monthName}_${sheetYear}`.substring(0,31);
+                                const sheetName = `${monthName}_${sheetYear}`;
                                 XLSX.utils.book_append_sheet(wb, ws, sheetName);
                             }
                         }
                     });
-                });
-            } else {
-                Object.keys(timesheets).forEach(key => {
-                    if (key.startsWith(employeeId)) {
-                        const [empId, sheetYear, sheetMonth] = key.split('-');
-                        if ((month === 'all' || sheetMonth === month) && (year === 'all' || sheetYear === year)) {
-                            const employee = employees.find(emp => emp.id === empId);
-                            const monthName = getMonthName(parseInt(sheetMonth));
-                            const daysData = timesheets[key];
-                            const data = [["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]];
-                            const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
-                            for (let day = 1; day <= daysInMonth; day++) {
-                                const dayData = daysData[day] || { entrada:'', saidaIntervalo:'', voltaIntervalo:'', saida:'', dayType:'normal', dayTypeText:'', atestadoHours:'', total:'', balance:'' };
-                                const formatTime = (time) => !time ? '' : time.length === 5 ? time+':00' : time;
-                                data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total||'', dayData.balance||'', dayData.dayType, dayData.dayTypeText||'', dayData.atestadoHours||'']);
-                            }
-                            const ws = XLSX.utils.aoa_to_sheet(data);
-                            const wscols = [{wch:5},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
-                            ws['!cols'] = wscols;
-                            const sheetName = `${monthName}_${sheetYear}`;
-                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                        }
-                    }
-                });
+                }
+                if (wb.SheetNames.length === 0) { showNotification('Nenhum dado encontrado para exportar!', 'warning'); return; }
+                const fileName = `Registro_Ponto_${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                showNotification('Dados exportados com sucesso!');
+            } catch (error) {
+                console.error('Erro ao exportar para Excel:', error);
+                showNotification('Erro ao exportar para Excel: ' + error.message, 'error');
             }
-            if (wb.SheetNames.length === 0) { showNotification('Nenhum dado encontrado para exportar!', 'warning'); return; }
-            const fileName = `Registro_Ponto_${new Date().toISOString().split('T')[0]}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-            showNotification('Dados exportados com sucesso!');
         }
 
         function importFromExcel() {
-            const employeeId = document.getElementById('importEmployee').value;
-            const fileInput = document.getElementById('importFile');
-            if (!employeeId) { showNotification('Selecione um funcionário para importação!', 'error'); return; }
-            if (!fileInput.files.length) { showNotification('Selecione um arquivo Excel para importar!', 'error'); return; }
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type:'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header:1});
-                    if (jsonData.length < 2) throw new Error('Arquivo sem dados');
-                    const month = parseInt(prompt("Digite o número do mês (1-12):", new Date().getMonth()+1)) - 1;
-                    const year = parseInt(prompt("Digite o ano:", new Date().getFullYear()));
-                    if (isNaN(month) || month<0 || month>11 || isNaN(year)) throw new Error('Mês ou ano inválido');
-                    const timesheetKey = `${employeeId}-${year}-${month}`;
-                    const daysData = {};
-                    for (let i=1; i<jsonData.length; i++) {
-                        const row = jsonData[i];
-                        if (row.length >= 5) {
-                            const day = parseInt(row[0]);
-                            const formatTimeFromExcel = (excelTime) => {
-                                if (!excelTime) return '';
-                                if (typeof excelTime === 'number') {
-                                    const totalSeconds = Math.floor(excelTime * 24 * 60 * 60);
-                                    const hours = Math.floor(totalSeconds / 3600);
-                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
-                                    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+            try {
+                const employeeId = document.getElementById('importEmployee').value;
+                const fileInput = document.getElementById('importFile');
+                if (!employeeId) { showNotification('Selecione um funcionário para importação!', 'error'); return; }
+                if (!fileInput.files.length) { showNotification('Selecione um arquivo Excel para importar!', 'error'); return; }
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type:'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, {header:1});
+                        if (jsonData.length < 2) throw new Error('Arquivo sem dados');
+                        const month = parseInt(prompt("Digite o número do mês (1-12):", new Date().getMonth()+1)) - 1;
+                        const year = parseInt(prompt("Digite o ano:", new Date().getFullYear()));
+                        if (isNaN(month) || month<0 || month>11 || isNaN(year)) throw new Error('Mês ou ano inválido');
+                        const timesheetKey = `${employeeId}-${year}-${month}`;
+                        const daysData = {};
+                        for (let i=1; i<jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (row.length >= 5) {
+                                const day = parseInt(row[0]);
+                                const formatTimeFromExcel = (excelTime) => {
+                                    if (!excelTime) return '';
+                                    if (typeof excelTime === 'number') {
+                                        const totalSeconds = Math.floor(excelTime * 24 * 60 * 60);
+                                        const hours = Math.floor(totalSeconds / 3600);
+                                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                        return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+                                    }
+                                    const timeStr = String(excelTime);
+                                    if (timeStr.includes(':')) {
+                                        const parts = timeStr.split(':');
+                                        return `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}`;
+                                    }
+                                    return '';
+                                };
+                                const dayData = {
+                                    entrada: formatTimeFromExcel(row[1]),
+                                    saidaIntervalo: formatTimeFromExcel(row[2]),
+                                    voltaIntervalo: formatTimeFromExcel(row[3]),
+                                    saida: formatTimeFromExcel(row[4]),
+                                    dayType: row[7] ? row[7].toLowerCase() : 'normal',
+                                    dayTypeText: row[8] || '',
+                                    atestadoHours: row[9] || '',
+                                    total: '',
+                                    balance: ''
+                                };
+                                if (dayData.entrada && dayData.saida && (dayData.dayType==='normal'||dayData.dayType==='atestado')) {
+                                    const employee = employees.find(emp => emp.id === employeeId);
+                                    if (employee) {
+                                        const currentDate = new Date(year, month, day);
+                                        const dayOfWeek = currentDate.getDay();
+                                        const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                                        dayData.total = resultado.total;
+                                        dayData.balance = resultado.balance;
+                                    }
                                 }
-                                const timeStr = String(excelTime);
-                                if (timeStr.includes(':')) {
-                                    const parts = timeStr.split(':');
-                                    return `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}`;
-                                }
-                                return '';
-                            };
-                            const dayData = {
-                                entrada: formatTimeFromExcel(row[1]),
-                                saidaIntervalo: formatTimeFromExcel(row[2]),
-                                voltaIntervalo: formatTimeFromExcel(row[3]),
-                                saida: formatTimeFromExcel(row[4]),
-                                dayType: row[7] ? row[7].toLowerCase() : 'normal',
-                                dayTypeText: row[8] || '',
-                                atestadoHours: row[9] || '',
-                                total: '',
-                                balance: ''
-                            };
-                            if (dayData.entrada && dayData.saida && (dayData.dayType==='normal'||dayData.dayType==='atestado')) {
-                                const employee = employees.find(emp => emp.id === employeeId);
-                                if (employee) {
-                                    const currentDate = new Date(year, month, day);
-                                    const dayOfWeek = currentDate.getDay();
-                                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
-                                    dayData.total = resultado.total;
-                                    dayData.balance = resultado.balance;
-                                }
+                                daysData[day] = dayData;
                             }
-                            daysData[day] = dayData;
                         }
-                    }
-                    timesheets[timesheetKey] = daysData;
-                    saveTimesheet(timesheetKey, daysData).then(() => {
+                        timesheets[timesheetKey] = daysData;
+                        await saveTimesheet(timesheetKey, daysData);
                         showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
                         fileInput.value = '';
                         if (employeeId === currentEmployeeId && month === parseInt(document.getElementById('monthSelect').value) && year === parseInt(document.getElementById('yearSelect').value)) {
                             generateCalendar();
                         }
-                    });
-                } catch (error) {
-                    showNotification('Erro ao importar arquivo: ' + error.message, 'error');
-                }
-            };
-            reader.readAsArrayBuffer(file);
+                    } catch (error) {
+                        showNotification('Erro ao importar arquivo: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error('Erro ao importar:', error);
+                showNotification('Erro ao importar: ' + error.message, 'error');
+            }
         }
 
         async function exportBackup() {
-            const backupData = { employees, timesheets, holidays, exportDate: new Date().toISOString(), version: '5.0-indexeddb' };
-            const dataStr = JSON.stringify(backupData, null, 2);
-            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-            const exportFileDefaultName = `backup_ponto_completo_${new Date().toISOString().split('T')[0]}.json`;
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileDefaultName);
-            linkElement.click();
-            showNotification('Backup exportado com sucesso!');
+            try {
+                const backupData = { employees, timesheets, holidays, exportDate: new Date().toISOString(), version: '5.0-indexeddb' };
+                const dataStr = JSON.stringify(backupData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = `backup_ponto_completo_${new Date().toISOString().split('T')[0]}.json`;
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                showNotification('Backup exportado com sucesso!');
+            } catch (error) {
+                console.error('Erro ao exportar backup:', error);
+                showNotification('Erro ao exportar backup: ' + error.message, 'error');
+            }
         }
 
         async function importBackupMerge() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = function(event) {
-                const file = event.target.files[0];
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    try {
-                        const backupData = JSON.parse(e.target.result);
-                        if (!backupData.employees || !backupData.timesheets || !backupData.holidays) throw new Error('Formato de arquivo inválido');
-                        let addedEmployees = 0, updatedEmployees = 0, addedTimesheets = 0, updatedTimesheets = 0, addedHolidays = 0;
-                        for (const backupEmp of backupData.employees) {
-                            const existingIndex = employees.findIndex(emp => emp.id === backupEmp.id);
-                            if (existingIndex === -1) {
-                                employees.push(backupEmp);
-                                await put(STORES.EMPLOYEES, backupEmp);
-                                addedEmployees++;
-                            } else {
-                                const existingEmp = employees[existingIndex];
-                                const mergedEmp = { ...backupEmp, ...existingEmp };
-                                employees[existingIndex] = mergedEmp;
-                                await put(STORES.EMPLOYEES, mergedEmp);
-                                updatedEmployees++;
+            try {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = function(event) {
+                    const file = event.target.files[0];
+                    const reader = new FileReader();
+                    reader.onload = async function(e) {
+                        try {
+                            const backupData = JSON.parse(e.target.result);
+                            if (!backupData.employees || !backupData.timesheets || !backupData.holidays) throw new Error('Formato de arquivo inválido');
+                            let addedEmployees = 0, updatedEmployees = 0, addedTimesheets = 0, updatedTimesheets = 0, addedHolidays = 0;
+                            for (const backupEmp of backupData.employees) {
+                                const existingIndex = employees.findIndex(emp => emp.id === backupEmp.id);
+                                if (existingIndex === -1) {
+                                    employees.push(backupEmp);
+                                    await put(STORES.EMPLOYEES, backupEmp);
+                                    addedEmployees++;
+                                } else {
+                                    const existingEmp = employees[existingIndex];
+                                    const mergedEmp = { ...backupEmp, ...existingEmp };
+                                    employees[existingIndex] = mergedEmp;
+                                    await put(STORES.EMPLOYEES, mergedEmp);
+                                    updatedEmployees++;
+                                }
                             }
-                        }
-                        for (const backupHoliday of backupData.holidays) {
-                            const existingHoliday = holidays.find(h => h.id === backupHoliday.id || (h.name === backupHoliday.name && h.date === backupHoliday.date));
-                            if (!existingHoliday) {
-                                holidays.push(backupHoliday);
-                                await put(STORES.HOLIDAYS, backupHoliday);
-                                addedHolidays++;
+                            for (const backupHoliday of backupData.holidays) {
+                                const existingHoliday = holidays.find(h => h.id === backupHoliday.id || (h.name === backupHoliday.name && h.date === backupHoliday.date));
+                                if (!existingHoliday) {
+                                    holidays.push(backupHoliday);
+                                    await put(STORES.HOLIDAYS, backupHoliday);
+                                    addedHolidays++;
+                                }
                             }
-                        }
-                        for (const [key, backupDays] of Object.entries(backupData.timesheets)) {
-                            if (!timesheets[key]) {
-                                timesheets[key] = backupDays;
-                                await saveTimesheet(key, backupDays);
-                                addedTimesheets++;
-                            } else {
-                                const existingDays = timesheets[key];
-                                let daysAdded = 0, daysUpdated = 0;
-                                for (const [day, backupDay] of Object.entries(backupDays)) {
-                                    if (!existingDays[day]) {
-                                        existingDays[day] = backupDay;
-                                        daysAdded++;
-                                    } else if (backupDay.entrada && backupDay.saida && (!existingDays[day].entrada || !existingDays[day].saida)) {
-                                        existingDays[day] = backupDay;
-                                        daysUpdated++;
-                                    } else if (backupDay.dayType !== 'normal' && existingDays[day].dayType === 'normal') {
-                                        existingDays[day].dayType = backupDay.dayType;
-                                        existingDays[day].dayTypeText = backupDay.dayTypeText;
-                                        existingDays[day].atestadoHours = backupDay.atestadoHours || '';
-                                        daysUpdated++;
+                            for (const [key, backupDays] of Object.entries(backupData.timesheets)) {
+                                if (!timesheets[key]) {
+                                    timesheets[key] = backupDays;
+                                    await saveTimesheet(key, backupDays);
+                                    addedTimesheets++;
+                                } else {
+                                    const existingDays = timesheets[key];
+                                    let daysAdded = 0, daysUpdated = 0;
+                                    for (const [day, backupDay] of Object.entries(backupDays)) {
+                                        if (!existingDays[day]) {
+                                            existingDays[day] = backupDay;
+                                            daysAdded++;
+                                        } else if (backupDay.entrada && backupDay.saida && (!existingDays[day].entrada || !existingDays[day].saida)) {
+                                            existingDays[day] = backupDay;
+                                            daysUpdated++;
+                                        } else if (backupDay.dayType !== 'normal' && existingDays[day].dayType === 'normal') {
+                                            existingDays[day].dayType = backupDay.dayType;
+                                            existingDays[day].dayTypeText = backupDay.dayTypeText;
+                                            existingDays[day].atestadoHours = backupDay.atestadoHours || '';
+                                            daysUpdated++;
+                                        }
+                                    }
+                                    if (daysAdded>0 || daysUpdated>0) {
+                                        updatedTimesheets++;
+                                        await saveTimesheet(key, existingDays);
                                     }
                                 }
-                                if (daysAdded>0 || daysUpdated>0) {
-                                    updatedTimesheets++;
-                                    await saveTimesheet(key, existingDays);
-                                }
                             }
+                            if (addedEmployees>0 || updatedEmployees>0 || addedTimesheets>0 || updatedTimesheets>0 || addedHolidays>0) {
+                                updateEmployeeSelects();
+                                renderEmployeesList();
+                                renderHolidaysList();
+                                if (currentEmployeeId) generateCalendar();
+                                let message = 'Backup mesclado com sucesso! ';
+                                if (addedEmployees>0) message += `Adicionados: ${addedEmployees} funcionários. `;
+                                if (updatedEmployees>0) message += `Atualizados: ${updatedEmployees} funcionários. `;
+                                if (addedTimesheets>0) message += `Adicionados: ${addedTimesheets} registros de ponto. `;
+                                if (updatedTimesheets>0) message += `Atualizados: ${updatedTimesheets} registros de ponto. `;
+                                if (addedHolidays>0) message += `Adicionados: ${addedHolidays} feriados.`;
+                                showNotification(message.trim());
+                            } else {
+                                showNotification('Nenhum novo dado encontrado no backup. Todos os dados já existem no sistema.', 'warning');
+                            }
+                        } catch (error) {
+                            showNotification('Erro ao restaurar backup: ' + error.message, 'error');
                         }
-                        if (addedEmployees>0 || updatedEmployees>0 || addedTimesheets>0 || updatedTimesheets>0 || addedHolidays>0) {
-                            updateEmployeeSelects();
-                            renderEmployeesList();
-                            renderHolidaysList();
-                            if (currentEmployeeId) generateCalendar();
-                            let message = 'Backup mesclado com sucesso! ';
-                            if (addedEmployees>0) message += `Adicionados: ${addedEmployees} funcionários. `;
-                            if (updatedEmployees>0) message += `Atualizados: ${updatedEmployees} funcionários. `;
-                            if (addedTimesheets>0) message += `Adicionados: ${addedTimesheets} registros de ponto. `;
-                            if (updatedTimesheets>0) message += `Atualizados: ${updatedTimesheets} registros de ponto. `;
-                            if (addedHolidays>0) message += `Adicionados: ${addedHolidays} feriados.`;
-                            showNotification(message.trim());
-                        } else {
-                            showNotification('Nenhum novo dado encontrado no backup. Todos os dados já existem no sistema.', 'warning');
-                        }
-                    } catch (error) {
-                        showNotification('Erro ao restaurar backup: ' + error.message, 'error');
-                    }
+                    };
+                    reader.readAsText(file);
                 };
-                reader.readAsText(file);
-            };
-            input.click();
+                input.click();
+            } catch (error) {
+                console.error('Erro ao importar backup:', error);
+                showNotification('Erro ao importar backup: ' + error.message, 'error');
+            }
         }
 
         async function clearAllData() {
-            if (!confirm('Isso apagará TODOS os dados (funcionários, registros e feriados). Tem certeza?')) return;
-            await clearStore(STORES.EMPLOYEES);
-            await clearStore(STORES.TIMESHEETS);
-            await clearStore(STORES.HOLIDAYS);
-            employees = [];
-            timesheets = {};
-            holidays = generateHolidaysFromBase(null);
-            for (const h of holidays) {
-                await put(STORES.HOLIDAYS, h);
+            try {
+                if (!confirm('Isso apagará TODOS os dados (funcionários, registros e feriados). Tem certeza?')) return;
+                await clearStore(STORES.EMPLOYEES);
+                await clearStore(STORES.TIMESHEETS);
+                await clearStore(STORES.HOLIDAYS);
+                employees = [];
+                timesheets = {};
+                holidays = generateHolidaysFromBase(null);
+                for (const h of holidays) {
+                    await put(STORES.HOLIDAYS, h);
+                }
+                currentEmployeeId = '';
+                updateEmployeeSelects();
+                renderEmployeesList();
+                renderHolidaysList();
+                document.getElementById('timesheetBody').innerHTML = `<tr><td colspan="10" class="empty-state"><i class="fas fa-calendar-day"></i><p>Selecione um funcionário, mês e ano para começar</p></td></tr>`;
+                document.getElementById('totalMonthHours').textContent = '00:00';
+                document.getElementById('totalMonthBalance').textContent = '00:00';
+                document.getElementById('totalFolgas').textContent = '0';
+                document.getElementById('totalFeriados').textContent = '0';
+                document.getElementById('totalAtestados').textContent = '0';
+                document.getElementById('totalFaltas').textContent = '0';
+                document.getElementById('resetDailyConfig').click();
+                showNotification('Todos os dados foram removidos! Feriados padrão restaurados.', 'warning');
+            } catch (error) {
+                console.error('Erro ao limpar dados:', error);
+                showNotification('Erro ao limpar dados: ' + error.message, 'error');
             }
-            currentEmployeeId = '';
-            updateEmployeeSelects();
-            renderEmployeesList();
-            renderHolidaysList();
-            document.getElementById('timesheetBody').innerHTML = `<tr><td colspan="10" class="empty-state"><i class="fas fa-calendar-day"></i><p>Selecione um funcionário, mês e ano para começar</p></td></tr>`;
-            document.getElementById('totalMonthHours').textContent = '00:00';
-            document.getElementById('totalMonthBalance').textContent = '00:00';
-            document.getElementById('totalFolgas').textContent = '0';
-            document.getElementById('totalFeriados').textContent = '0';
-            document.getElementById('totalAtestados').textContent = '0';
-            document.getElementById('totalFaltas').textContent = '0';
-            document.getElementById('resetDailyConfig').click();
-            showNotification('Todos os dados foram removidos! Feriados padrão restaurados.', 'warning');
         }
 
         // --- Função formatDate corrigida (usa string diretamente) ---
