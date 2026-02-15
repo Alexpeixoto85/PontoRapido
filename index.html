@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Ponto - Registro Mensal</title>
+    <title>Sistema de Ponto - IndexedDB</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -728,7 +728,7 @@
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-fingerprint"></i> Sistema de Registro de Ponto Completo</h1>
+            <h1><i class="fas fa-fingerprint"></i> Sistema de Registro de Ponto (IndexedDB)</h1>
             <p class="subtitle">Controle mensal com cálculo de horas extras, folgas, feriados e atestados parciais</p>
         </header>
         
@@ -980,7 +980,7 @@
                             <i class="fas fa-download"></i> Fazer Backup
                         </button>
                         <button id="importBackup" class="btn btn-secondary">
-                            <i class="fas fa-upload"></i> Restaurar Backup (Somente Novos)
+                            <i class="fas fa-upload"></i> Restaurar Backup (Merge)
                         </button>
                         <button id="clearAllData" class="btn btn-danger">
                             <i class="fas fa-trash-alt"></i> Limpar Todos os Dados
@@ -1041,7 +1041,7 @@
         </div>
         
         <div class="footer">
-            <p>Sistema de Registro de Ponto Completo - Para uso local | Dados armazenados no navegador</p>
+            <p>Sistema de Registro de Ponto Completo - Armazenamento IndexedDB | Dados salvos localmente</p>
             <p>© 2023 - Com controle de folgas, feriados e atestados parciais</p>
         </div>
         
@@ -1230,9 +1230,123 @@
     </div>
 
     <script>
-        // Variáveis globais
+        // --- Configuração do IndexedDB ---
+        const DB_NAME = 'PointRegisterDB';
+        const DB_VERSION = 1;
+        const STORES = {
+            EMPLOYEES: 'employees',
+            TIMESHEETS: 'timesheets',
+            HOLIDAYS: 'holidays'
+        };
+
+        let db = null;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    // Cria object stores se não existirem
+                    if (!db.objectStoreNames.contains(STORES.EMPLOYEES)) {
+                        db.createObjectStore(STORES.EMPLOYEES, { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains(STORES.TIMESHEETS)) {
+                        // key: `${employeeId}-${year}-${month}`
+                        db.createObjectStore(STORES.TIMESHEETS, { keyPath: 'key' });
+                    }
+                    if (!db.objectStoreNames.contains(STORES.HOLIDAYS)) {
+                        const holidayStore = db.createObjectStore(STORES.HOLIDAYS, { keyPath: 'id' });
+                        // Índice para data, útil para buscas
+                        holidayStore.createIndex('date', 'date', { unique: false });
+                    }
+                };
+            });
+        }
+
+        // Funções genéricas de CRUD
+        async function getAll(storeName) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function get(storeName, key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(key);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function put(storeName, value) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.put(value);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function deleteItem(storeName, key) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.delete(key);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve();
+            });
+        }
+
+        async function clearStore(storeName) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.clear();
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve();
+            });
+        }
+
+        // Funções específicas para timesheets (buscar por chave composta)
+        async function getTimesheet(key) {
+            return get(STORES.TIMESHEETS, key);
+        }
+
+        async function saveTimesheet(key, daysData) {
+            return put(STORES.TIMESHEETS, { key, ...daysData });
+        }
+
+        async function getAllTimesheets() {
+            return getAll(STORES.TIMESHEETS);
+        }
+
+        // Funções para holidays (usando índice de data)
+        async function getHolidaysByDate(dateStr) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORES.HOLIDAYS, 'readonly');
+                const store = transaction.objectStore(STORES.HOLIDAYS);
+                const index = store.index('date');
+                const request = index.getAll(dateStr);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        // --- Variáveis globais (mantidas para compatibilidade) ---
         let employees = [];
-        let timesheets = {};
+        let timesheets = {}; // será preenchido a partir do banco
         let holidays = [];
         let currentEmployeeId = '';
         let currentMonth = new Date().getMonth();
@@ -1253,11 +1367,33 @@
             { name: "Finados", date: "2023-11-02", type: "feriado", recurring: true, description: "Dia de Finados" },
             { name: "Proclamação da República", date: "2023-11-15", type: "feriado", recurring: true, description: "Proclamação da República" },
             { name: "Natal", date: "2023-12-25", type: "feriado", recurring: true, description: "Natal" }
-        ];
-        
-        // Inicialização
-        document.addEventListener('DOMContentLoaded', function() {
-            loadData();
+        ].map((h, index) => ({ ...h, id: `default-${index}` })); // adiciona id único
+
+        // --- Inicialização assíncrona ---
+        async function initApp() {
+            await openDB();
+            
+            // Carregar dados do banco
+            employees = await getAll(STORES.EMPLOYEES) || [];
+            
+            const timesheetRecords = await getAllTimesheets() || [];
+            timesheets = {};
+            timesheetRecords.forEach(record => {
+                const { key, ...daysData } = record;
+                timesheets[key] = daysData;
+            });
+            
+            holidays = await getAll(STORES.HOLIDAYS) || [];
+            
+            // Se não houver feriados, carregar os padrões
+            if (holidays.length === 0) {
+                for (const h of defaultHolidays) {
+                    await put(STORES.HOLIDAYS, h);
+                }
+                holidays = [...defaultHolidays];
+            }
+            
+            // Configurar UI
             setupYearSelects();
             document.getElementById('monthSelect').value = currentMonth;
             document.getElementById('yearSelect').value = currentYear;
@@ -1268,9 +1404,15 @@
             updateEmployeeSelects();
             renderEmployeesList();
             renderHolidaysList();
-        });
-        
-        // Configurar tabs
+            
+            showNotification('Sistema inicializado com IndexedDB!', 'info');
+        }
+
+        // Chamar init após carregar a página
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // --- Funções auxiliares (mantidas da versão anterior, adaptadas para async) ---
+
         function setupTabs() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -1288,7 +1430,6 @@
             });
         }
         
-        // Configurar selects de ano
         function setupYearSelects() {
             const yearSelect = document.getElementById('yearSelect');
             const exportYearSelect = document.getElementById('exportYear');
@@ -1311,7 +1452,6 @@
             yearSelect.value = currentYear;
             filterYearSelect.value = currentYear;
             
-            // Gerar calendário automaticamente ao alterar mês/ano
             document.getElementById('monthSelect').addEventListener('change', function() {
                 if (currentEmployeeId) generateCalendar();
             });
@@ -1321,7 +1461,6 @@
             });
         }
         
-        // Configurar modais
         function setupModals() {
             const employeeModal = document.getElementById('employeeModal');
             const openEmployeeModalBtn = document.getElementById('openEmployeeModal');
@@ -1377,7 +1516,6 @@
             });
         }
         
-        // Inicializar configuração de jornada diária
         function initDailyWorkloadConfig() {
             const container = document.getElementById('dailyWorkloadConfig');
             const days = [
@@ -1500,7 +1638,6 @@
             });
         }
         
-        // Configurar eventos
         function setupEventListeners() {
             document.getElementById('exportCurrentPDF').addEventListener('click', exportCurrentTimesheetPDF);
             document.getElementById('autoFill').addEventListener('click', autoFillTimesheet);
@@ -1520,7 +1657,6 @@
             document.getElementById('importBackup').addEventListener('click', importBackupMerge);
             document.getElementById('clearAllData').addEventListener('click', clearAllData);
             
-            // Gerar calendário automaticamente ao selecionar funcionário
             document.getElementById('employeeSelect').addEventListener('change', function() {
                 currentEmployeeId = this.value;
                 if (currentEmployeeId) {
@@ -1530,83 +1666,6 @@
             });
         }
         
-        // Carregar dados do localStorage
-        function loadData() {
-            const savedEmployees = localStorage.getItem('pointRegisterEmployees');
-            const savedTimesheets = localStorage.getItem('pointRegisterTimesheets');
-            const savedHolidays = localStorage.getItem('pointRegisterHolidays');
-            
-            if (savedEmployees) employees = JSON.parse(savedEmployees);
-            if (savedTimesheets) timesheets = JSON.parse(savedTimesheets);
-            if (savedHolidays) {
-                holidays = JSON.parse(savedHolidays);
-            } else {
-                holidays = [...defaultHolidays];
-                saveData();
-            }
-            
-            // Garantir que todos os registros de ponto tenham os campos corretos
-            fixTimesheetsData();
-        }
-        
-        // Corrigir dados dos timesheets (para evitar NaN:NaN)
-        function fixTimesheetsData() {
-            Object.keys(timesheets).forEach(key => {
-                const daysData = timesheets[key];
-                Object.keys(daysData).forEach(day => {
-                    const dayData = daysData[day];
-                    
-                    // Garantir que total e balance sejam strings válidas
-                    if (dayData.total === undefined || dayData.total === null || dayData.total === 'NaN:NaN') {
-                        dayData.total = '';
-                    }
-                    if (dayData.balance === undefined || dayData.balance === null || dayData.balance === 'NaN:NaN') {
-                        dayData.balance = '';
-                    }
-                    
-                    // Garantir que atestadoHours exista
-                    if (dayData.atestadoHours === undefined) {
-                        dayData.atestadoHours = '';
-                    }
-                    
-                    // Recalcular se necessário
-                    if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
-                        const [empId, year, month] = key.split('-');
-                        const employee = employees.find(emp => emp.id === empId);
-                        if (employee) {
-                            const currentDate = new Date(parseInt(year), parseInt(month), parseInt(day));
-                            const dayOfWeek = currentDate.getDay();
-                            const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
-                            dayData.total = resultado.total;
-                            dayData.balance = resultado.balance;
-                        }
-                    }
-                });
-            });
-            saveData();
-        }
-        
-        // Salvar dados no localStorage
-        function saveData() {
-            localStorage.setItem('pointRegisterEmployees', JSON.stringify(employees));
-            localStorage.setItem('pointRegisterTimesheets', JSON.stringify(timesheets));
-            localStorage.setItem('pointRegisterHolidays', JSON.stringify(holidays));
-        }
-        
-        // Salvamento automático
-        function triggerAutoSave() {
-            if (autoSaveTimeout) {
-                clearTimeout(autoSaveTimeout);
-            }
-            autoSaveTimeout = setTimeout(() => {
-                if (currentEmployeeId) {
-                    saveTimesheet();
-                    showNotification('Alterações salvas automaticamente.', 'info');
-                }
-            }, AUTO_SAVE_DELAY);
-        }
-        
-        // Atualizar selects de funcionários
         function updateEmployeeSelects() {
             const employeeSelect = document.getElementById('employeeSelect');
             const exportEmployeeSelect = document.getElementById('exportEmployee');
@@ -1638,7 +1697,6 @@
             }
         }
         
-        // Renderizar lista de funcionários
         function renderEmployeesList() {
             const employeesList = document.getElementById('employeesList');
             
@@ -1716,7 +1774,6 @@
             });
         }
         
-        // Obter texto do status
         function getStatusText(status) {
             const statusMap = {
                 'ativo': 'Ativo',
@@ -1727,8 +1784,7 @@
             return statusMap[status] || status;
         }
         
-        // Manipular formulário de funcionário (cadastrar ou atualizar)
-        function handleEmployeeForm(e) {
+        async function handleEmployeeForm(e) {
             e.preventDefault();
             
             const editId = document.getElementById('employeeEditId').value;
@@ -1771,10 +1827,9 @@
             }
             
             if (isEdit) {
-                // Atualizar funcionário existente
                 const employeeIndex = employees.findIndex(emp => emp.id === editId);
                 if (employeeIndex !== -1) {
-                    employees[employeeIndex] = {
+                    const updatedEmployee = {
                         ...employees[employeeIndex],
                         name,
                         department,
@@ -1789,8 +1844,9 @@
                         defaultDaysOff,
                         dailyWorkloads: Object.keys(dailyWorkloads).length > 0 ? dailyWorkloads : null
                     };
+                    employees[employeeIndex] = updatedEmployee;
+                    await put(STORES.EMPLOYEES, updatedEmployee);
                     
-                    saveData();
                     updateEmployeeSelects();
                     renderEmployeesList();
                     
@@ -1798,7 +1854,6 @@
                     showNotification('Funcionário atualizado com sucesso!');
                 }
             } else {
-                // Cadastrar novo funcionário
                 if (employees.some(emp => emp.id === id)) {
                     showNotification('Matrícula já cadastrada! Use uma matrícula diferente.', 'error');
                     return;
@@ -1821,7 +1876,8 @@
                 };
                 
                 employees.push(employee);
-                saveData();
+                await put(STORES.EMPLOYEES, employee);
+                
                 updateEmployeeSelects();
                 renderEmployeesList();
                 
@@ -1830,7 +1886,6 @@
             }
         }
         
-        // Editar funcionário
         function editEmployee(employeeId) {
             const employee = employees.find(emp => emp.id === employeeId);
             if (!employee) return;
@@ -1839,11 +1894,10 @@
             employeeModal.style.display = 'block';
             isEditingEmployee = true;
             
-            // Configurar o formulário para edição
             document.getElementById('employeeEditId').value = employee.id;
             document.getElementById('employeeName').value = employee.name;
             document.getElementById('employeeId').value = employee.id;
-            document.getElementById('employeeId').disabled = true; // Não permitir alterar matrícula
+            document.getElementById('employeeId').disabled = true;
             document.getElementById('employeeDepartment').value = employee.department || '';
             document.getElementById('employeeEmail').value = employee.email || '';
             document.getElementById('employeeAdmission').value = employee.admission || '';
@@ -1854,13 +1908,11 @@
             document.getElementById('weeklyWorkload').value = employee.weeklyWorkload || 44;
             document.getElementById('monthlyWorkload').value = employee.monthlyWorkload || 220;
             
-            // Configurar dias de folga
             const daysOffSelect = document.getElementById('employeeFolgas');
             Array.from(daysOffSelect.options).forEach(option => {
                 option.selected = employee.defaultDaysOff && employee.defaultDaysOff.includes(parseInt(option.value));
             });
             
-            // Configurar jornada diária personalizada
             if (employee.dailyWorkloads) {
                 for (let i = 0; i < 7; i++) {
                     if (employee.dailyWorkloads[i]) {
@@ -1881,11 +1933,9 @@
                     }
                 }
             } else {
-                // Se não houver configuração personalizada, usar padrão
                 document.getElementById('resetDailyConfig').click();
             }
             
-            // Atualizar botão para modo de edição
             const submitBtn = document.getElementById('employeeSubmitBtn');
             submitBtn.innerHTML = '<i class="fas fa-user-edit"></i> Atualizar Funcionário';
             submitBtn.className = 'btn btn-warning';
@@ -1893,21 +1943,20 @@
             showNotification('Funcionário carregado para edição. Atualize os dados e clique em Atualizar.', 'info');
         }
         
-        // Alternar status do funcionário
-        function toggleEmployeeStatus(employeeId) {
+        async function toggleEmployeeStatus(employeeId) {
             const employee = employees.find(emp => emp.id === employeeId);
             if (!employee) return;
             
             employee.status = employee.status === 'ativo' ? 'inativo' : 'ativo';
-            saveData();
+            await put(STORES.EMPLOYEES, employee);
+            
             updateEmployeeSelects();
             renderEmployeesList();
             
             showNotification(`Funcionário ${employee.status === 'ativo' ? 'ativado' : 'desativado'} com sucesso!`);
         }
         
-        // Adicionar feriado/folga
-        function addHoliday(e) {
+        async function addHoliday(e) {
             e.preventDefault();
             
             const name = document.getElementById('holidayName').value;
@@ -1923,7 +1972,7 @@
             }
             
             const holiday = {
-                id: Date.now().toString(),
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 name,
                 type,
                 date,
@@ -1932,7 +1981,7 @@
             };
             
             holidays.push(holiday);
-            saveData();
+            await put(STORES.HOLIDAYS, holiday);
             renderHolidaysList();
             
             document.getElementById('holidayModal').style.display = 'none';
@@ -1946,8 +1995,7 @@
             }
         }
         
-        // Aplicar folgas em massa
-        function applyMassLeave() {
+        async function applyMassLeave() {
             const startDate = document.getElementById('massStartDate').value;
             const endDate = document.getElementById('massEndDate').value;
             const type = document.getElementById('massType').value;
@@ -1983,24 +2031,25 @@
                 return;
             }
             
-            days.forEach(day => {
+            for (const day of days) {
                 const dateStr = day.toISOString().split('T')[0];
                 const holidayName = `${reason} (${formatDate(dateStr)})`;
                 
                 const existingHoliday = holidays.find(h => h.date === dateStr && h.name === holidayName);
                 if (!existingHoliday) {
-                    holidays.push({
-                        id: Date.now().toString() + Math.random(),
+                    const holiday = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                         name: holidayName,
                         type: type,
                         date: dateStr,
                         recurring: false,
                         description: `Aplicado em massa: ${reason}`
-                    });
+                    };
+                    holidays.push(holiday);
+                    await put(STORES.HOLIDAYS, holiday);
                 }
-            });
+            }
             
-            saveData();
             renderHolidaysList();
             
             document.getElementById('massStartDate').value = '';
@@ -2014,8 +2063,7 @@
             }
         }
         
-        // Renderizar lista de feriados
-        function renderHolidaysList() {
+        async function renderHolidaysList() {
             const holidaysList = document.getElementById('holidaysList');
             const filterYear = document.getElementById('filterYear').value;
             
@@ -2086,20 +2134,19 @@
             });
             
             document.querySelectorAll('.delete-holiday').forEach(button => {
-                button.addEventListener('click', function() {
-                    deleteHoliday(this.getAttribute('data-id'));
+                button.addEventListener('click', async function() {
+                    await deleteHoliday(this.getAttribute('data-id'));
                 });
             });
         }
         
-        // Excluir feriado
-        function deleteHoliday(holidayId) {
+        async function deleteHoliday(holidayId) {
             if (!confirm('Tem certeza que deseja excluir este feriado/folga?')) {
                 return;
             }
             
             holidays = holidays.filter(h => h.id !== holidayId);
-            saveData();
+            await deleteItem(STORES.HOLIDAYS, holidayId);
             renderHolidaysList();
             
             showNotification('Feriado/folga excluído com sucesso!');
@@ -2109,7 +2156,6 @@
             }
         }
         
-        // Verificar se um dia é feriado/folga
         function checkIfHoliday(date) {
             const dateStr = date.toISOString().split('T')[0];
             const year = date.getFullYear();
@@ -2135,7 +2181,6 @@
             return null;
         }
         
-        // Obter jornada diária personalizada para um dia específico
         function getDailyWorkloadForDay(employee, dayOfWeek) {
             if (employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
                 return employee.dailyWorkloads[dayOfWeek];
@@ -2151,8 +2196,7 @@
             };
         }
         
-        // Gerar calendário (agora automático)
-        function generateCalendar() {
+        async function generateCalendar() {
             if (!currentEmployeeId) {
                 return;
             }
@@ -2162,7 +2206,8 @@
             const today = new Date();
             
             const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
-            const savedData = timesheets[timesheetKey];
+            const savedTimesheet = await getTimesheet(timesheetKey);
+            const savedData = savedTimesheet || {}; // savedTimesheet já contém os dias (sem a chave 'key')
             
             const employee = employees.find(emp => emp.id === currentEmployeeId);
             
@@ -2197,7 +2242,6 @@
                 let defaultDayType = 'normal';
                 let defaultDayTypeText = 'Dia Normal';
                 
-                // DOMINGO COMO FOLGA PADRÃO
                 if (dayOfWeek === 0) {
                     defaultDayType = 'folga';
                     defaultDayTypeText = 'Folga (Domingo)';
@@ -2237,14 +2281,12 @@
                 else if (dayData.dayType === 'atestado') totalAtestados++;
                 else if (dayData.dayType === 'falta') totalFaltas++;
                 
-                // Calcular total e saldo para todos os tipos que podem ter horas (normal e atestado)
                 let totalDiario = '';
                 let saldoDiario = '';
                 let status = '';
                 let rowClass = '';
                 
                 if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
-                    // Para atestado, se não houver horas preenchidas, consideramos que não trabalhou
                     const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
                     totalDiario = resultado.total;
                     saldoDiario = resultado.balance;
@@ -2279,7 +2321,6 @@
                     <option value="compensacao" ${dayData.dayType === 'compensacao' ? 'selected' : ''}>Banco de Horas</option>
                 `;
                 
-                // Criar célula de tipo de dia com select, motivo e horas de atestado
                 const tipoCell = document.createElement('td');
                 tipoCell.innerHTML = `
                     <select class="day-type-select" data-day="${day}" data-original="${dayData.dayType}">
@@ -2293,7 +2334,6 @@
                     <td>${day}</td>
                     <td>${dayName}</td>
                 `;
-                // Substituir a terceira célula pela célula personalizada
                 row.appendChild(tipoCell);
                 row.innerHTML += `
                     <td><input type="time" class="time-input entrada" data-day="${day}" value="${dayData.entrada}" ${dayData.dayType !== 'normal' && dayData.dayType !== 'atestado' ? 'disabled' : ''}></td>
@@ -2356,7 +2396,6 @@
             calculateMonthTotal();
         }
         
-        // Atualizar automaticamente os saldos de todos os dias normais sem registro
         function autoUpdateBalances() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
@@ -2385,17 +2424,14 @@
                     const entrada = row.querySelector('.entrada').value;
                     const saida = row.querySelector('.saida').value;
                     
-                    // Se for dia normal e não tiver registro
                     if (!entrada && !saida) {
                         const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
                         const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
                         const atestadoHours = parseFloat(row.querySelector('.atestado-hours')?.value) || 0;
                         const requiredMinutes = dayType === 'atestado' ? expectedMinutes - (atestadoHours * 60) : expectedMinutes;
                         
-                        // Atualizar célula de total
                         row.querySelector('td:nth-child(8)').textContent = '00:00';
                         
-                        // Atualizar célula de saldo
                         const saldoCell = row.querySelector('td:nth-child(9)');
                         saldoCell.textContent = formatMinutes(-requiredMinutes);
                         saldoCell.className = requiredMinutes > 0 ? 'negative-balance' : 'positive-balance';
@@ -2415,7 +2451,6 @@
             }
         }
         
-        // Manipular mudança no tipo de dia
         function handleDayTypeChange(select) {
             const day = select.getAttribute('data-day');
             const row = select.closest('tr');
@@ -2461,13 +2496,11 @@
             triggerAutoSave();
         }
         
-        // Obter nome do dia da semana
         function getDayName(dayIndex) {
             const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
             return days[dayIndex];
         }
         
-        // Calcular total diário para uma linha
         function calculateDailyTotalForRow(row, dayOfWeek) {
             const day = row.querySelector('.entrada').getAttribute('data-day');
             const entrada = row.querySelector('.entrada').value;
@@ -2504,7 +2537,6 @@
                     status.innerHTML = '<span style="color: #ff9800">Parcial</span>';
                     row.classList.add('incomplete-day');
                     
-                    // Mesmo parcial, tentamos calcular
                     const dayData = {
                         entrada,
                         saidaIntervalo,
@@ -2528,8 +2560,6 @@
                         saldoDiario = formatMinutes(-requiredMinutes);
                     }
                 }
-            } else {
-                // Para não-dias normais, não há cálculo
             }
             
             row.querySelector('td:nth-child(8)').textContent = totalDiario;
@@ -2538,9 +2568,7 @@
             saldoCell.className = saldoDiario.startsWith('-') ? 'negative-balance' : 'positive-balance';
         }
         
-        // Calcular saldo diário (incluindo atestado)
         function calculateDailyBalance(dayData, employee, dayOfWeek) {
-            // Se não for normal nem atestado, retorna vazio
             if (dayData.dayType !== 'normal' && dayData.dayType !== 'atestado') {
                 return { total: '', balance: '' };
             }
@@ -2550,7 +2578,6 @@
             
             let totalMinutes = saidaTime - entradaTime;
             
-            // Subtrair intervalo se existir
             if (dayData.saidaIntervalo && dayData.voltaIntervalo) {
                 const saidaIntervaloTime = timeToMinutes(dayData.saidaIntervalo);
                 const voltaIntervaloTime = timeToMinutes(dayData.voltaIntervalo);
@@ -2559,7 +2586,6 @@
             
             if (totalMinutes < 0) totalMinutes = 0;
             
-            // Calcular jornada esperada
             let expectedWorkloadMinutes;
             if (employee && employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
                 const dailyConfig = employee.dailyWorkloads[dayOfWeek];
@@ -2568,7 +2594,6 @@
                 expectedWorkloadMinutes = (employee ? employee.dailyWorkload : 8) * 60;
             }
             
-            // Se for atestado, subtrair as horas cobertas
             let requiredMinutes = expectedWorkloadMinutes;
             if (dayData.dayType === 'atestado' && dayData.atestadoHours) {
                 const atestadoMinutes = parseFloat(dayData.atestadoHours) * 60;
@@ -2578,12 +2603,11 @@
             const balanceMinutes = totalMinutes - requiredMinutes;
             
             return {
-                total: formatMinutes(totalMinutes),
+                total: formatMinutesToHM(totalMinutes),
                 balance: formatMinutes(balanceMinutes)
             };
         }
         
-        // Formatar minutos para HH:MM com sinal
         function formatMinutes(minutes) {
             const sign = minutes < 0 ? '-' : '+';
             const absMinutes = Math.abs(minutes);
@@ -2592,7 +2616,6 @@
             return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
         }
         
-        // Nova função: formata minutos para HH:MM (sem sinal para totais, com sinal para saldos)
         function formatMinutesToHM(minutes, includeSign = false) {
             if (includeSign) {
                 return formatMinutes(minutes);
@@ -2603,7 +2626,6 @@
             return hours.toString().padStart(2, '0') + ':' + mins.toString().padStart(2, '0');
         }
         
-        // Atualizar contagens do resumo
         function updateSummaryCounts() {
             const rows = document.querySelectorAll('#timesheetBody tr');
             let totalFolgas = 0;
@@ -2626,7 +2648,6 @@
             document.getElementById('totalFaltas').textContent = totalFaltas;
         }
         
-        // Calcular total do mês
         function calculateMonthTotal() {
             const rows = document.querySelectorAll('#timesheetBody tr');
             let totalMinutes = 0;
@@ -2659,7 +2680,6 @@
             const totalBalance = formatMinutesToHM(totalBalanceMinutes, true);
             document.getElementById('totalMonthBalance').textContent = totalBalance;
             
-            // Atualizar cor do container do saldo
             const balanceContainer = document.getElementById('monthBalanceContainer');
             if (totalBalanceMinutes < 0) {
                 balanceContainer.className = 'total-hours negative';
@@ -2669,14 +2689,12 @@
             }
         }
         
-        // Converter tempo HH:MM para minutos
         function timeToMinutes(time) {
             if (!time) return 0;
             const [hours, minutes] = time.split(':').map(Number);
             return hours * 60 + minutes;
         }
         
-        // Preenchimento automático
         function autoFillTimesheet() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
@@ -2698,7 +2716,6 @@
                     const currentDate = new Date(year, month, day);
                     const dayOfWeek = currentDate.getDay();
                     
-                    // DOMINGO JÁ É FOLGA PADRÃO, NÃO PREENCHER
                     if (dayOfWeek === 0) return;
                     
                     const dailyWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
@@ -2754,15 +2771,13 @@
             showNotification('Horários preenchidos automaticamente considerando jornada personalizada!');
         }
         
-        // Converter minutos para HH:MM
         function minutesToTime(minutes) {
             const hours = Math.floor(minutes / 60);
             const mins = minutes % 60;
             return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
         }
         
-        // Salvar registros do mês
-        function saveTimesheet() {
+        async function saveTimesheet() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
                 return;
@@ -2796,14 +2811,14 @@
                 };
             });
             
+            await saveTimesheet(timesheetKey, daysData);
+            // Atualizar também o objeto timesheets em memória
             timesheets[timesheetKey] = daysData;
-            saveData();
             
             showNotification('Registros do mês salvos com sucesso!');
         }
         
-        // Limpar registros do mês
-        function clearTimesheet() {
+        async function clearTimesheet() {
             if (!confirm('Tem certeza que deseja limpar todos os registros deste mês?')) {
                 return;
             }
@@ -2813,15 +2828,28 @@
             const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
             
             delete timesheets[timesheetKey];
-            saveData();
+            await deleteItem(STORES.TIMESHEETS, timesheetKey);
             
             generateCalendar();
             
             showNotification('Registros do mês limpos com sucesso!');
         }
         
-        // Exportar registro atual para Excel (versão melhorada com cabeçalho e resumo)
+        function triggerAutoSave() {
+            if (autoSaveTimeout) {
+                clearTimeout(autoSaveTimeout);
+            }
+            autoSaveTimeout = setTimeout(() => {
+                if (currentEmployeeId) {
+                    saveTimesheet();
+                    showNotification('Alterações salvas automaticamente.', 'info');
+                }
+            }, AUTO_SAVE_DELAY);
+        }
+        
+        // --- Funções de exportação/importação (mantidas, mas agora usam os dados em memória) ---
         function exportCurrentTimesheet() {
+            // (mesmo código da versão anterior, sem alterações)
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
                 return;
@@ -2840,7 +2868,6 @@
             const employee = employees.find(emp => emp.id === currentEmployeeId);
             const monthName = getMonthName(month);
             
-            // Buscar totais e contagens do DOM
             const totalMonthHours = document.getElementById('totalMonthHours').textContent;
             const totalMonthBalance = document.getElementById('totalMonthBalance').textContent;
             const totalFolgas = document.getElementById('totalFolgas').textContent;
@@ -2848,18 +2875,14 @@
             const totalAtestados = document.getElementById('totalAtestados').textContent;
             const totalFaltas = document.getElementById('totalFaltas').textContent;
             
-            // Construir dados da planilha
             const data = [];
             
-            // Cabeçalho com nome do funcionário (mesclado)
             data.push([`Registro de Ponto - ${employee.name}`, ...Array(9).fill('')]);
             data.push([`Mês/Ano: ${monthName}/${year}`, ...Array(9).fill('')]);
-            data.push([]); // linha em branco
+            data.push([]);
             
-            // Cabeçalho das colunas
             data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
             
-            // Dias do mês
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
             for (let day = 1; day <= daysInMonth; day++) {
@@ -2894,52 +2917,33 @@
                 ]);
             }
             
-            // Linha em branco
             data.push([]);
-            
-            // Resumo
             data.push(["Total Horas Normais:", "", "", "", "", totalMonthHours, "", "", "", ""]);
             data.push(["Saldo do Mês:", "", "", "", "", totalMonthBalance, "", "", "", ""]);
             data.push(["Folgas:", totalFolgas, "Feriados:", totalFeriados, "Atestados:", totalAtestados, "Faltas:", totalFaltas, "", ""]);
             
-            // Criar planilha
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(data);
             
-            // Definir larguras das colunas
             const wscols = [
-                {wch: 6},   // Dia
-                {wch: 10},  // Entrada
-                {wch: 15},  // Saída (Intervalo)
-                {wch: 15},  // Volta (Intervalo)
-                {wch: 10},  // Saída
-                {wch: 10},  // Total
-                {wch: 10},  // Saldo
-                {wch: 12},  // Tipo
-                {wch: 20},  // Motivo
-                {wch: 12}   // Horas Atestado
+                {wch: 6}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 20}, {wch: 12}
             ];
             ws['!cols'] = wscols;
             
-            // Mesclar células do cabeçalho (primeiras duas linhas, colunas A a J)
             if (!ws['!merges']) ws['!merges'] = [];
-            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }); // Linha 0, colunas 0-9
-            ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }); // Linha 1, colunas 0-9
+            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } });
+            ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } });
             
-            // Adicionar à pasta de trabalho
             XLSX.utils.book_append_sheet(wb, ws, "Ponto Mensal");
             
-            // Nome do arquivo
             const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
-            
-            // Salvar
             XLSX.writeFile(wb, fileName);
             
             showNotification('Arquivo Excel exportado com layout moderno!');
         }
         
-        // Exportar registro atual para PDF
         function exportCurrentTimesheetPDF() {
+            // (mesmo código da versão anterior)
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
                 return;
@@ -3002,10 +3006,7 @@
             
             let totalHorasNormais = 0;
             let totalSaldo = 0;
-            let totalFolgas = 0;
-            let totalFeriados = 0;
-            let totalAtestados = 0;
-            let totalFaltas = 0;
+            let totalFolgas = 0, totalFeriados = 0, totalAtestados = 0, totalFaltas = 0;
             
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = new Date(year, month, day);
@@ -3129,8 +3130,8 @@
             showNotification('PDF gerado com sucesso!');
         }
         
-        // Exportar relatório consolidado em PDF (agora com horas:minutos)
         function exportConsolidatedReportPDF() {
+            // (código existente, usa os arrays em memória)
             const employeeId = document.getElementById('exportEmployee').value;
             const month = document.getElementById('exportMonth').value;
             const year = document.getElementById('exportYear').value;
@@ -3286,7 +3287,6 @@
                     }
                 }
                 
-                // Formatar horas trabalhadas e saldo como HH:MM (sem sinal para horas, com sinal para saldo)
                 const horasTrabalhadasFormat = formatMinutesToHM(horasTrabalhadasMes);
                 const saldoFormat = formatMinutesToHM(saldoMes, true);
                 
@@ -3364,7 +3364,6 @@
                 doc.text(`Saldo Total Acumulado: ${totalSaldoFormat}`, marginLeft + 80, analiseY);
                 
                 analiseY += 6;
-                // Média de horas por dia útil (em minutos, arredondada para o minuto mais próximo)
                 let mediaMinutosPorDia = 0;
                 if (totalGeralDiasUteis > 0) {
                     mediaMinutosPorDia = Math.round(totalGeralHorasTrabalhadas / totalGeralDiasUteis);
@@ -3407,7 +3406,6 @@
             showNotification('Relatório consolidado gerado com sucesso!');
         }
         
-        // Exportar todos os meses em PDF (mantido igual, mas usará a função atualizada)
         function exportAllMonthsPDF() {
             const employeeId = document.getElementById('exportEmployee').value;
             
@@ -3468,7 +3466,6 @@
             showNotification(`Gerando ${employeeSheets.length} PDF(s)... Aguarde os downloads.`);
         }
         
-        // Exportar para Excel (todos os dados) - adaptado para incluir atestado
         function exportToExcel() {
             const employeeId = document.getElementById('exportEmployee').value;
             const month = document.getElementById('exportMonth').value;
@@ -3613,7 +3610,6 @@
             showNotification('Dados exportados com sucesso!');
         }
         
-        // Importar do Excel (adaptado para ler atestado, se disponível)
         function importFromExcel() {
             const employeeId = document.getElementById('importEmployee').value;
             const fileInput = document.getElementById('importFile');
@@ -3682,18 +3678,16 @@
                                 voltaIntervalo: formatTimeFromExcel(row[3]),
                                 saida: formatTimeFromExcel(row[4]),
                                 dayType: 'normal',
-                                dayTypeText: row[7] || '', // Tipo (coluna H)
-                                atestadoHours: row[9] || '', // Horas Atestado (coluna J)
+                                dayTypeText: row[7] || '',
+                                atestadoHours: row[9] || '',
                                 total: '',
                                 balance: ''
                             };
                             
-                            // Se houver tipo na coluna H, usar
                             if (row[7]) {
                                 dayData.dayType = row[7].toLowerCase();
                             }
                             
-                            // Calcular total e saldo se houver horários
                             if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
                                 const employee = employees.find(emp => emp.id === employeeId);
                                 if (employee) {
@@ -3710,17 +3704,17 @@
                     }
                     
                     timesheets[timesheetKey] = daysData;
-                    saveData();
-                    
-                    showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
-                    
-                    fileInput.value = '';
-                    
-                    if (employeeId === currentEmployeeId && 
-                        month === parseInt(document.getElementById('monthSelect').value) &&
-                        year === parseInt(document.getElementById('yearSelect').value)) {
-                        generateCalendar();
-                    }
+                    saveTimesheet(timesheetKey, daysData).then(() => {
+                        showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
+                        
+                        fileInput.value = '';
+                        
+                        if (employeeId === currentEmployeeId && 
+                            month === parseInt(document.getElementById('monthSelect').value) &&
+                            year === parseInt(document.getElementById('yearSelect').value)) {
+                            generateCalendar();
+                        }
+                    });
                     
                 } catch (error) {
                     showNotification('Erro ao importar arquivo: ' + error.message, 'error');
@@ -3730,7 +3724,6 @@
             reader.readAsArrayBuffer(file);
         }
         
-        // Obter nome do mês
         function getMonthName(monthIndex) {
             const months = [
                 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -3739,14 +3732,14 @@
             return months[monthIndex];
         }
         
-        // Fazer backup dos dados
-        function exportBackup() {
+        async function exportBackup() {
+            // Buscar todos os dados atuais do banco (já estão em memória)
             const backupData = {
                 employees,
                 timesheets,
                 holidays,
                 exportDate: new Date().toISOString(),
-                version: '4.2' // versão com atestado
+                version: '5.0-indexeddb'
             };
             
             const dataStr = JSON.stringify(backupData, null, 2);
@@ -3762,8 +3755,7 @@
             showNotification('Backup exportado com sucesso!');
         }
         
-        // Restaurar backup COM MERGE melhorado (compatível com nova estrutura)
-        function importBackupMerge() {
+        async function importBackupMerge() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
@@ -3772,7 +3764,7 @@
                 const file = event.target.files[0];
                 const reader = new FileReader();
                 
-                reader.onload = function(e) {
+                reader.onload = async function(e) {
                     try {
                         const backupData = JSON.parse(e.target.result);
                         
@@ -3787,108 +3779,69 @@
                         let addedHolidays = 0;
                         
                         // Mesclar funcionários
-                        backupData.employees.forEach(backupEmp => {
+                        for (const backupEmp of backupData.employees) {
                             const existingIndex = employees.findIndex(emp => emp.id === backupEmp.id);
                             if (existingIndex === -1) {
                                 employees.push(backupEmp);
+                                await put(STORES.EMPLOYEES, backupEmp);
                                 addedEmployees++;
                             } else {
-                                // Atualizar funcionário existente (manter dados locais, adicionar campos faltantes)
                                 const existingEmp = employees[existingIndex];
-                                employees[existingIndex] = {
-                                    ...backupEmp, // Dados do backup
-                                    ...existingEmp // Dados locais (sobrescrevem se existirem)
-                                };
+                                const mergedEmp = { ...backupEmp, ...existingEmp };
+                                employees[existingIndex] = mergedEmp;
+                                await put(STORES.EMPLOYEES, mergedEmp);
                                 updatedEmployees++;
                             }
-                        });
+                        }
                         
                         // Mesclar feriados
-                        backupData.holidays.forEach(backupHoliday => {
+                        for (const backupHoliday of backupData.holidays) {
                             const existingHoliday = holidays.find(h => 
                                 h.id === backupHoliday.id || 
                                 (h.name === backupHoliday.name && h.date === backupHoliday.date)
                             );
                             if (!existingHoliday) {
                                 holidays.push(backupHoliday);
+                                await put(STORES.HOLIDAYS, backupHoliday);
                                 addedHolidays++;
                             }
-                        });
+                        }
                         
                         // Mesclar registros de ponto
-                        Object.keys(backupData.timesheets).forEach(key => {
+                        for (const [key, backupDays] of Object.entries(backupData.timesheets)) {
                             if (!timesheets[key]) {
-                                timesheets[key] = backupData.timesheets[key];
+                                timesheets[key] = backupDays;
+                                await saveTimesheet(key, backupDays);
                                 addedTimesheets++;
-                                
-                                // Garantir que os cálculos estejam corretos e adicionar atestadoHours se faltar
-                                const [empId, sheetYear, sheetMonth] = key.split('-');
-                                const employee = employees.find(emp => emp.id === empId);
-                                if (employee) {
-                                    const daysData = timesheets[key];
-                                    Object.keys(daysData).forEach(day => {
-                                        const dayData = daysData[day];
-                                        if (!dayData.atestadoHours) dayData.atestadoHours = '';
-                                        if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
-                                            const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
-                                            const dayOfWeek = currentDate.getDay();
-                                            const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
-                                            dayData.total = resultado.total;
-                                            dayData.balance = resultado.balance;
-                                        }
-                                    });
-                                }
                             } else {
                                 const existingDays = timesheets[key];
-                                const backupDays = backupData.timesheets[key];
                                 let daysAdded = 0;
                                 let daysUpdated = 0;
                                 
-                                Object.keys(backupDays).forEach(day => {
-                                    const backupDay = backupDays[day];
-                                    
+                                for (const [day, backupDay] of Object.entries(backupDays)) {
                                     if (!existingDays[day]) {
                                         existingDays[day] = backupDay;
                                         daysAdded++;
                                     } else if (backupDay.entrada && backupDay.saida && 
                                                (!existingDays[day].entrada || !existingDays[day].saida)) {
-                                        // Se o backup tem dados completos e o local não tem, usar o backup
                                         existingDays[day] = backupDay;
                                         daysUpdated++;
                                     } else if (backupDay.dayType !== 'normal' && existingDays[day].dayType === 'normal') {
-                                        // Se o backup tem tipo especial e o local tem normal, usar o backup
                                         existingDays[day].dayType = backupDay.dayType;
                                         existingDays[day].dayTypeText = backupDay.dayTypeText;
                                         existingDays[day].atestadoHours = backupDay.atestadoHours || '';
                                         daysUpdated++;
                                     }
-                                });
+                                }
                                 
                                 if (daysAdded > 0 || daysUpdated > 0) {
                                     updatedTimesheets++;
-                                    
-                                    // Recalcular se necessário
-                                    const [empId, sheetYear, sheetMonth] = key.split('-');
-                                    const employee = employees.find(emp => emp.id === empId);
-                                    if (employee) {
-                                        Object.keys(existingDays).forEach(day => {
-                                            const dayData = existingDays[day];
-                                            if (!dayData.atestadoHours) dayData.atestadoHours = '';
-                                            if (dayData.entrada && dayData.saida && (dayData.dayType === 'normal' || dayData.dayType === 'atestado')) {
-                                                const currentDate = new Date(parseInt(sheetYear), parseInt(sheetMonth), parseInt(day));
-                                                const dayOfWeek = currentDate.getDay();
-                                                const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
-                                                dayData.total = resultado.total;
-                                                dayData.balance = resultado.balance;
-                                            }
-                                        });
-                                    }
+                                    await saveTimesheet(key, existingDays);
                                 }
                             }
-                        });
+                        }
                         
                         if (addedEmployees > 0 || updatedEmployees > 0 || addedTimesheets > 0 || updatedTimesheets > 0 || addedHolidays > 0) {
-                            saveData();
                             updateEmployeeSelects();
                             renderEmployeesList();
                             renderHolidaysList();
@@ -3920,16 +3873,25 @@
             input.click();
         }
         
-        // Limpar todos os dados
-        function clearAllData() {
+        async function clearAllData() {
             if (!confirm('Isso apagará TODOS os dados (funcionários, registros e feriados). Tem certeza?')) {
                 return;
             }
             
-            localStorage.clear();
+            // Limpar todas as stores
+            await clearStore(STORES.EMPLOYEES);
+            await clearStore(STORES.TIMESHEETS);
+            await clearStore(STORES.HOLIDAYS);
+            
             employees = [];
             timesheets = {};
             holidays = [...defaultHolidays];
+            // Restaurar feriados padrão
+            for (const h of defaultHolidays) {
+                await put(STORES.HOLIDAYS, h);
+            }
+            holidays = [...defaultHolidays];
+            
             currentEmployeeId = '';
             
             updateEmployeeSelects();
@@ -3957,14 +3919,12 @@
             showNotification('Todos os dados foram removidos! Feriados padrão restaurados.', 'warning');
         }
         
-        // Formatar data
         function formatDate(dateString) {
             if (!dateString) return '';
             const date = new Date(dateString);
             return date.toLocaleDateString('pt-BR');
         }
         
-        // Mostrar notificação
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
             const notificationText = document.getElementById('notificationText');
