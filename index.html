@@ -1346,7 +1346,14 @@
             }
         };
 
-        // --- Função para gerar objetos de feriado ---
+        // --- Função auxiliar para converter string ISO (YYYY-MM-DD) em Date no fuso local ---
+        function parseISOLocal(dateStr) {
+            if (!dateStr) return null;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d); // local time at midnight
+        }
+
+        // --- Função para gerar objetos de feriado (corrigida: usa currentYear) ---
         function generateHolidaysFromBase(cityKey) {
             const year = currentYear;
             let newHolidays = [];
@@ -1932,6 +1939,27 @@
             calculateMonthTotal();
         }
 
+        // --- Função corrigida para verificar feriados (sem problemas de fuso) ---
+        function checkIfHoliday(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth();      // 0-11
+            const day = date.getDate();          // 1-31
+            for (const holiday of holidays) {
+                // Extrair componentes da string ISO do feriado
+                const [hYear, hMonth, hDay] = holiday.date.split('-').map(Number);
+                if (holiday.recurring) {
+                    if (hMonth - 1 === month && hDay === day) {
+                        return holiday;
+                    }
+                } else {
+                    if (hYear === year && hMonth - 1 === month && hDay === day) {
+                        return holiday;
+                    }
+                }
+            }
+            return null;
+        }
+
         function timeToMinutes(time) {
             if (!time) return 0;
             const [hours, minutes] = time.split(':').map(Number);
@@ -2265,28 +2293,6 @@
             };
         }
 
-        function checkIfHoliday(date) {
-            const dateStr = date.toISOString().split('T')[0];
-            const year = date.getFullYear();
-            const month = date.getMonth();
-            const day = date.getDate();
-            for (const holiday of holidays) {
-                const holidayDate = new Date(holiday.date);
-                if (holiday.recurring) {
-                    if (holidayDate.getMonth() === month && holidayDate.getDate() === day) {
-                        return holiday;
-                    }
-                } else {
-                    if (holidayDate.getFullYear() === year && 
-                        holidayDate.getMonth() === month && 
-                        holidayDate.getDate() === day) {
-                        return holiday;
-                    }
-                }
-            }
-            return null;
-        }
-
         // --- Funções de CRUD de funcionários e feriados (originais) ---
         function updateEmployeeSelects() {
             const employeeSelect = document.getElementById('employeeSelect');
@@ -2582,6 +2588,7 @@
             if (currentEmployeeId) generateCalendar();
         }
 
+        // --- Função renderHolidaysList corrigida (sem problemas de fuso) ---
         async function renderHolidaysList() {
             const holidaysList = document.getElementById('holidaysList');
             const filterYear = document.getElementById('filterYear').value;
@@ -2601,12 +2608,15 @@
                 `;
                 return;
             }
-            filteredHolidays.sort((a, b) => new Date(a.date) - new Date(b.date));
+            // Ordenação por data (usando comparação de string YYYY-MM-DD)
+            filteredHolidays.sort((a, b) => a.date.localeCompare(b.date));
             holidaysList.innerHTML = '';
             filteredHolidays.forEach(holiday => {
-                const holidayDate = new Date(holiday.date);
-                const dayOfWeek = getDayName(holidayDate.getDay());
-                const dateFormatted = formatDate(holiday.date);
+                const holidayDate = parseISOLocal(holiday.date);
+                const dayOfWeek = holidayDate ? getDayName(holidayDate.getDay()) : '';
+                // Formata a data manualmente para evitar deslocamento de fuso
+                const [year, month, day] = holiday.date.split('-');
+                const dateFormatted = `${day}/${month}/${year}`;
                 const typeColors = { 'feriado': '#ff9800', 'folga': '#4caf50', 'recesso': '#2196f3' };
                 const typeTexts = { 'feriado': 'Feriado', 'folga': 'Folga', 'recesso': 'Recesso' };
                 const holidayItem = document.createElement('div');
@@ -3129,10 +3139,11 @@
             showNotification('Todos os dados foram removidos! Feriados padrão restaurados.', 'warning');
         }
 
+        // --- Função formatDate corrigida (usa string diretamente) ---
         function formatDate(dateString) {
             if (!dateString) return '';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR');
+            const [y, m, d] = dateString.split('-');
+            return `${d}/${m}/${y}`;
         }
 
         function showNotification(message, type = 'success') {
