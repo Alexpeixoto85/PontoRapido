@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
-        /* ESTILOS EXISTENTES (MANTIDOS) – NENHUMA ALTERAÇÃO NECESSÁRIA */
+        /* ESTILOS EXISTENTES (MANTIDOS) – NENHUMA ALTERAÇÃO */
         * {
             margin: 0;
             padding: 0;
@@ -1276,7 +1276,7 @@
     <script>
         // --- Configuração do IndexedDB ---
         const DB_NAME = 'PointRegisterDB';
-        const DB_VERSION = 2; // Incrementado para nova store de configurações (opcional)
+        const DB_VERSION = 2;
         const STORES = {
             EMPLOYEES: 'employees',
             TIMESHEETS: 'timesheets',
@@ -1294,9 +1294,8 @@
         let autoSaveTimeout = null;
         const AUTO_SAVE_DELAY = 2000;
 
-        // --- Base de dados de feriados por cidade (nacionais + locais) ---
+        // --- Base de dados de feriados por cidade ---
         const holidayDatabase = {
-            // Feriados nacionais fixos (recorrentes)
             nacional: [
                 { name: "Confraternização Universal", type: "feriado", month: 0, day: 1, recurring: true, description: "Ano Novo" },
                 { name: "Tiradentes", type: "feriado", month: 3, day: 21, recurring: true, description: "Mártir da Inconfidência" },
@@ -1307,21 +1306,18 @@
                 { name: "Proclamação da República", type: "feriado", month: 10, day: 15, recurring: true, description: "15 de Novembro" },
                 { name: "Natal", type: "feriado", month: 11, day: 25, recurring: true, description: "Natal" }
             ],
-            // Feriados móveis (exemplo para 2025 – serão tratados como não recorrentes)
             moveis: [
                 { name: "Carnaval", type: "feriado", date: "2025-03-04", recurring: false, description: "Terça-feira de Carnaval" },
                 { name: "Sexta-feira Santa", type: "feriado", date: "2025-04-18", recurring: false, description: "Paixão de Cristo" },
                 { name: "Corpus Christi", type: "feriado", date: "2025-06-19", recurring: false, description: "Corpus Christi" }
             ],
-            // Feriados estaduais/municipais por cidade (apenas alguns exemplos)
             cidades: {
                 SaoPaulo: [
                     { name: "Aniversário de São Paulo", type: "feriado", month: 0, day: 25, recurring: true, description: "Fundação da cidade" },
                     { name: "Revolução Constitucionalista", type: "feriado", month: 6, day: 9, recurring: true, description: "Dia da Revolução de 1932" }
                 ],
                 RioDeJaneiro: [
-                    { name: "Dia de São Jorge", type: "feriado", month: 3, day: 23, recurring: true, description: "Padroeiro do Rio" },
-                    { name: "Dia do Padroeiro do Rio", type: "feriado", month: 9, day: 12, recurring: true, description: "Nossa Senhora Aparecida (já nacional)" } // Evitar duplicata
+                    { name: "Dia de São Jorge", type: "feriado", month: 3, day: 23, recurring: true, description: "Padroeiro do Rio" }
                 ],
                 BeloHorizonte: [
                     { name: "Aniversário de Belo Horizonte", type: "feriado", month: 11, day: 12, recurring: true, description: "Fundação da cidade" }
@@ -1350,12 +1346,11 @@
             }
         };
 
-        // --- Função para gerar objetos de feriado a partir do banco (com ano atual) ---
+        // --- Função para gerar objetos de feriado ---
         function generateHolidaysFromBase(cityKey) {
-            const year = currentYear; // usa o ano corrente para datas não recorrentes
+            const year = currentYear;
             let newHolidays = [];
 
-            // Nacionais fixos
             holidayDatabase.nacional.forEach(item => {
                 const dateStr = `${year}-${String(item.month+1).padStart(2,'0')}-${String(item.day).padStart(2,'0')}`;
                 newHolidays.push({
@@ -1368,7 +1363,6 @@
                 });
             });
 
-            // Móveis (usam data fixa do exemplo – podem ser editados depois)
             holidayDatabase.moveis.forEach(item => {
                 newHolidays.push({
                     id: `mov-${item.date}-${Date.now()}-${Math.random()}`,
@@ -1380,11 +1374,9 @@
                 });
             });
 
-            // Feriados da cidade selecionada
             if (cityKey && holidayDatabase.cidades[cityKey]) {
                 holidayDatabase.cidades[cityKey].forEach(item => {
                     if (item.date) {
-                        // data fixa
                         newHolidays.push({
                             id: `city-${cityKey}-${item.date}-${Date.now()}-${Math.random()}`,
                             name: item.name,
@@ -1409,7 +1401,7 @@
             return newHolidays;
         }
 
-        // --- Função para carregar feriados da cidade (mesclar) ---
+        // --- Carregar feriados da cidade (mesclar) ---
         async function loadCityHolidays(cityKey) {
             if (!cityKey) {
                 showNotification('Selecione uma cidade.', 'warning');
@@ -1430,7 +1422,7 @@
             if (currentEmployeeId) generateCalendar();
         }
 
-        // --- Função para preencher jornada diária a partir dos horários padrão ---
+        // --- Aplicar horário padrão à jornada diária ---
         function applyWorkdayToDaily() {
             const workdayStart = document.getElementById('workdayStart').value;
             const workdayEnd = document.getElementById('workdayEnd').value;
@@ -1441,11 +1433,9 @@
             const totalMinutes = endMinutes - startMinutes;
             if (totalMinutes <= 0) return;
 
-            // Calcula intervalo de almoço (padrão 1 hora após 4h de trabalho)
             let lunchStartMinutes = startMinutes + 4 * 60;
             let lunchEndMinutes = lunchStartMinutes + 60;
             if (lunchEndMinutes > endMinutes) {
-                // Se não couber, ajusta
                 lunchStartMinutes = startMinutes + Math.floor(totalMinutes / 2);
                 lunchEndMinutes = lunchStartMinutes + 60;
                 if (lunchEndMinutes > endMinutes) {
@@ -1455,29 +1445,24 @@
             }
             const lunchStart = minutesToTime(lunchStartMinutes);
             const lunchEnd = minutesToTime(lunchEndMinutes);
-            const hoursWorked = (totalMinutes - 60) / 60; // descontando 1h de almoço
+            const hoursWorked = ((totalMinutes - 60) / 60).toFixed(2);
 
-            // Preenche para dias de semana (segunda a sexta)
             for (let i = 1; i <= 5; i++) {
                 document.getElementById(`dailyStart_${i}`).value = workdayStart;
                 document.getElementById(`dailyLunchStart_${i}`).value = lunchStart;
                 document.getElementById(`dailyLunchEnd_${i}`).value = lunchEnd;
                 document.getElementById(`dailyEnd_${i}`).value = workdayEnd;
-                document.getElementById(`dailyHours_${i}`).value = hoursWorked.toFixed(2);
-                // Mantém sábado como meio período (exemplo)
-                if (i === 5) {
-                    // Sexta já foi, mas podemos deixar sábado como 4h
-                }
+                document.getElementById(`dailyHours_${i}`).value = hoursWorked;
+                document.getElementById(`dailyDayOff_${i}`).checked = false;
             }
-            // Sábado (i=6) - manter padrão 09:00-13:00
+            // Sábado
             document.getElementById(`dailyStart_6`).value = '09:00';
             document.getElementById(`dailyLunchStart_6`).value = '';
             document.getElementById(`dailyLunchEnd_6`).value = '';
             document.getElementById(`dailyEnd_6`).value = '13:00';
             document.getElementById(`dailyHours_6`).value = '4';
             document.getElementById(`dailyDayOff_6`).checked = false;
-
-            // Domingo (i=0) - folga
+            // Domingo
             document.getElementById(`dailyStart_0`).value = '';
             document.getElementById(`dailyLunchStart_0`).value = '';
             document.getElementById(`dailyLunchEnd_0`).value = '';
@@ -1488,42 +1473,7 @@
             showNotification('Jornada diária preenchida com os horários padrão.');
         }
 
-        // --- Abrir IndexedDB e iniciar app ---
-        async function initApp() {
-            await openDB();
-            employees = await getAll(STORES.EMPLOYEES) || [];
-            const timesheetRecords = await getAllTimesheets() || [];
-            timesheets = {};
-            timesheetRecords.forEach(record => {
-                const { key, ...daysData } = record;
-                timesheets[key] = daysData;
-            });
-            holidays = await getAll(STORES.HOLIDAYS) || [];
-            
-            // Se não houver feriados, carregar nacionais padrão (para cidade não selecionada)
-            if (holidays.length === 0) {
-                const defaultHolidays = generateHolidaysFromBase(null); // só nacionais
-                for (const h of defaultHolidays) {
-                    await put(STORES.HOLIDAYS, h);
-                }
-                holidays = defaultHolidays;
-            }
-            
-            setupYearSelects();
-            document.getElementById('monthSelect').value = currentMonth;
-            document.getElementById('yearSelect').value = currentYear;
-            setupTabs();
-            setupEventListeners();
-            initDailyWorkloadConfig();
-            setupModals();
-            updateEmployeeSelects();
-            renderEmployeesList();
-            renderHolidaysList();
-            
-            showNotification('Sistema inicializado com IndexedDB!', 'info');
-        }
-
-        // --- IndexedDB helpers (mesmo código, apenas adicionado getAllTimesheets e saveTimesheet) ---
+        // --- IndexedDB helpers ---
         function openDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -1606,8 +1556,41 @@
             return getAll(STORES.TIMESHEETS);
         }
 
-        // --- Demais funções (setupTabs, setupYearSelects, etc.) mantidas do original, com adaptações ---
+        // --- Inicialização ---
+        async function initApp() {
+            await openDB();
+            employees = await getAll(STORES.EMPLOYEES) || [];
+            const timesheetRecords = await getAllTimesheets() || [];
+            timesheets = {};
+            timesheetRecords.forEach(record => {
+                const { key, ...daysData } = record;
+                timesheets[key] = daysData;
+            });
+            holidays = await getAll(STORES.HOLIDAYS) || [];
+            
+            if (holidays.length === 0) {
+                const defaultHolidays = generateHolidaysFromBase(null);
+                for (const h of defaultHolidays) {
+                    await put(STORES.HOLIDAYS, h);
+                }
+                holidays = defaultHolidays;
+            }
+            
+            setupYearSelects();
+            document.getElementById('monthSelect').value = currentMonth;
+            document.getElementById('yearSelect').value = currentYear;
+            setupTabs();
+            setupEventListeners();
+            initDailyWorkloadConfig();
+            setupModals();
+            updateEmployeeSelects();
+            renderEmployeesList();
+            renderHolidaysList();
+            
+            showNotification('Sistema inicializado com IndexedDB!', 'info');
+        }
 
+        // --- Funções de UI ---
         function setupTabs() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -1642,7 +1625,6 @@
         }
 
         function setupModals() {
-            // mesmo código original, apenas acrescentar listener para o novo botão "applyWorkdayToDaily"
             const employeeModal = document.getElementById('employeeModal');
             document.getElementById('openEmployeeModal').addEventListener('click', () => {
                 employeeModal.style.display = 'block';
@@ -1655,9 +1637,7 @@
                 document.getElementById('dailyWorkload').value = '8';
                 document.getElementById('weeklyWorkload').value = '44';
                 document.getElementById('monthlyWorkload').value = '220';
-                // Aplica jornada padrão
                 applyWorkdayToDaily();
-                document.getElementById('resetDailyConfig').click(); // garante defaults para sábado/domingo
             });
 
             document.getElementById('closeEmployeeModal').addEventListener('click', () => {
@@ -1784,12 +1764,10 @@
                 showNotification('Configuração padrão restaurada!');
             });
 
-            // Botão para aplicar horário padrão aos dias de semana
             document.getElementById('applyWorkdayToDaily').addEventListener('click', applyWorkdayToDaily);
         }
 
         function setupEventListeners() {
-            // Mesmos listeners originais, acrescentar o do botão de carregar feriados
             document.getElementById('exportCurrentPDF').addEventListener('click', exportCurrentTimesheetPDF);
             document.getElementById('autoFill').addEventListener('click', autoFillTimesheet);
             document.getElementById('autoUpdate').addEventListener('click', autoUpdateBalances);
@@ -1811,15 +1789,13 @@
                 currentEmployeeId = this.value;
                 if (currentEmployeeId) generateCalendar();
             });
-
-            // Novo listener para carregar feriados da cidade
             document.getElementById('loadCityHolidays').addEventListener('click', () => {
                 const city = document.getElementById('citySelect').value;
                 loadCityHolidays(city);
             });
         }
 
-        // --- Função generateCalendar modificada para auto-save apenas na saída ---
+        // --- Funções principais do calendário ---
         async function generateCalendar() {
             if (!currentEmployeeId) return;
             const month = parseInt(document.getElementById('monthSelect').value);
@@ -1921,7 +1897,6 @@
             document.getElementById('totalAtestados').textContent = totalAtestados;
             document.getElementById('totalFaltas').textContent = totalFaltas;
 
-            // Event listeners para selects e inputs
             document.querySelectorAll('.day-type-select').forEach(select => {
                 select.addEventListener('change', function() { handleDayTypeChange(this); });
             });
@@ -1931,21 +1906,18 @@
                     const dayOfWeek = new Date(year, month, parseInt(row.querySelector('.entrada').getAttribute('data-day'))).getDay();
                     calculateDailyTotalForRow(row, dayOfWeek);
                     calculateMonthTotal();
-                    triggerAutoSave(); // atestado também pode disparar? Deixamos como está, mas se quiser só saída, remover daqui
                 });
             });
 
-            // Event listener para inputs de tempo: apenas o campo "saida" dispara auto-save
+            // Auto-save apenas no campo "saida"
             document.querySelectorAll('.time-input').forEach(input => {
                 input.addEventListener('change', function() {
                     const row = this.closest('tr');
                     const dayOfWeek = new Date(year, month, parseInt(row.querySelector('.entrada').getAttribute('data-day'))).getDay();
                     calculateDailyTotalForRow(row, dayOfWeek);
                     calculateMonthTotal();
-                    // Se for o campo "saida", então salva automaticamente
                     if (this.classList.contains('saida')) {
                         triggerAutoSave();
-                        // Verifica se é o último dia do mês para mensagem
                         const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
                         if (day === daysInMonth) {
                             setTimeout(() => {
@@ -1960,7 +1932,6 @@
             calculateMonthTotal();
         }
 
-        // --- Funções auxiliares (calculateDailyBalance, formatMinutes, etc.) mantidas do original ---
         function timeToMinutes(time) {
             if (!time) return 0;
             const [hours, minutes] = time.split(':').map(Number);
@@ -2119,7 +2090,6 @@
             row.querySelector('td:nth-child(9)').textContent = '';
             calculateMonthTotal();
             updateSummaryCounts();
-            triggerAutoSave(); // mantido, mas só será chamado se for alterado por select? O usuário pode querer salvar mudança de tipo também.
         }
 
         function updateSummaryCounts() {
@@ -2145,37 +2115,1039 @@
             }, AUTO_SAVE_DELAY);
         }
 
-        // --- Demais funções (autoFillTimesheet, saveTimesheet, clearTimesheet, export, import, etc.) mantidas do original (omitidas por brevidade, mas devem ser incluídas) ---
-        // Para manter o código completo, seria necessário colar todas as funções originais (exportCurrentTimesheet, exportCurrentTimesheetPDF, etc.)
-        // Como o espaço é limitado, indicamos que elas devem ser mantidas exatamente como no código original fornecido.
-        // Aqui vamos apenas declarar os placeholders para não quebrar, mas no arquivo final devem ser incluídas.
+        // --- Funções de salvamento e manipulação de dados (originais) ---
+        async function saveTimesheet() {
+            if (!currentEmployeeId) {
+                showNotification('Selecione um funcionário primeiro!', 'error');
+                return;
+            }
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            const daysData = {};
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            rows.forEach(row => {
+                const day = row.querySelector('.entrada').getAttribute('data-day');
+                const dayType = row.querySelector('.day-type-select').value;
+                const dayTypeText = row.querySelector('.day-type-text').value || '';
+                const atestadoHours = row.querySelector('.atestado-hours').value || '';
+                daysData[day] = {
+                    entrada: row.querySelector('.entrada').value,
+                    saidaIntervalo: row.querySelector('.saida-intervalo').value,
+                    voltaIntervalo: row.querySelector('.volta-intervalo').value,
+                    saida: row.querySelector('.saida').value,
+                    dayType: dayType,
+                    dayTypeText: dayTypeText,
+                    atestadoHours: atestadoHours,
+                    total: row.querySelector('td:nth-child(8)').textContent,
+                    balance: row.querySelector('td:nth-child(9)').textContent
+                };
+            });
+            await saveTimesheet(timesheetKey, daysData);
+            timesheets[timesheetKey] = daysData;
+            showNotification('Registros do mês salvos com sucesso!');
+        }
 
-        // As funções abaixo são apenas stubs para evitar erros de referência. No arquivo final, substitua pelas funções originais completas.
-        async function saveTimesheet() { /* implementação original */ }
-        function autoFillTimesheet() { /* original */ }
-        function autoUpdateBalances() { /* original */ }
-        function clearTimesheet() { /* original */ }
-        function exportCurrentTimesheet() { /* original */ }
-        function exportCurrentTimesheetPDF() { /* original */ }
-        function exportConsolidatedReportPDF() { /* original */ }
-        function exportAllMonthsPDF() { /* original */ }
-        function exportToExcel() { /* original */ }
-        function importFromExcel() { /* original */ }
-        function exportBackup() { /* original */ }
-        function importBackupMerge() { /* original */ }
-        function clearAllData() { /* original */ }
-        function handleEmployeeForm(e) { /* original */ }
-        function addHoliday(e) { /* original */ }
-        function applyMassLeave() { /* original */ }
-        function renderHolidaysList() { /* original */ }
-        function updateEmployeeSelects() { /* original */ }
-        function renderEmployeesList() { /* original */ }
-        function getDailyWorkloadForDay(employee, dayOfWeek) { /* original */ }
-        function checkIfHoliday(date) { /* original */ }
-        function showNotification(msg, type) { /* original */ }
+        async function clearTimesheet() {
+            if (!confirm('Tem certeza que deseja limpar todos os registros deste mês?')) return;
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            delete timesheets[timesheetKey];
+            await deleteItem(STORES.TIMESHEETS, timesheetKey);
+            generateCalendar();
+            showNotification('Registros do mês limpos com sucesso!');
+        }
 
-        // Para que o código execute, precisamos das definições completas. Como não é possível copiar tudo aqui, o usuário deve manter o restante do script original, apenas adicionando as modificações acima.
-        // No arquivo final, substitua a tag <script> inteira pelo conteúdo original modificado conforme as alterações indicadas.
+        function autoFillTimesheet() {
+            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            if (!employee) return;
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            rows.forEach(row => {
+                const dayType = row.querySelector('.day-type-select').value;
+                const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
+                if (dayType === 'normal') {
+                    const currentDate = new Date(year, month, day);
+                    const dayOfWeek = currentDate.getDay();
+                    if (dayOfWeek === 0) return;
+                    const dailyWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
+                    if (dailyWorkload.dayOff) return;
+                    if (employee.defaultDaysOff && employee.defaultDaysOff.includes(dayOfWeek)) return;
+                    if (dailyWorkload.start && dailyWorkload.end) {
+                        row.querySelector('.entrada').value = dailyWorkload.start;
+                        row.querySelector('.saida').value = dailyWorkload.end;
+                        let expectedWorkloadHours;
+                        if (employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
+                            expectedWorkloadHours = employee.dailyWorkloads[dayOfWeek].hours || employee.dailyWorkload || 8;
+                        } else {
+                            expectedWorkloadHours = employee.dailyWorkload || 8;
+                        }
+                        if (expectedWorkloadHours > 6) {
+                            if (dailyWorkload.lunchStart && dailyWorkload.lunchEnd) {
+                                row.querySelector('.saida-intervalo').value = dailyWorkload.lunchStart;
+                                row.querySelector('.volta-intervalo').value = dailyWorkload.lunchEnd;
+                            } else {
+                                const startTime = timeToMinutes(dailyWorkload.start);
+                                const endTime = timeToMinutes(dailyWorkload.end);
+                                const totalMinutes = endTime - startTime;
+                                if (totalMinutes >= 6 * 60) {
+                                    const lunchStart = startTime + 4 * 60;
+                                    const lunchEnd = lunchStart + 60;
+                                    row.querySelector('.saida-intervalo').value = minutesToTime(lunchStart);
+                                    row.querySelector('.volta-intervalo').value = minutesToTime(lunchEnd);
+                                }
+                            }
+                        } else {
+                            row.querySelector('.saida-intervalo').value = '';
+                            row.querySelector('.volta-intervalo').value = '';
+                        }
+                        calculateDailyTotalForRow(row, dayOfWeek);
+                    }
+                }
+            });
+            calculateMonthTotal();
+            triggerAutoSave();
+            showNotification('Horários preenchidos automaticamente considerando jornada personalizada!');
+        }
+
+        function autoUpdateBalances() {
+            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
+            const rows = document.querySelectorAll('#timesheetBody tr');
+            let updatedCount = 0;
+            rows.forEach(row => {
+                const dayType = row.querySelector('.day-type-select').value;
+                const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
+                const currentDate = new Date(year, month, day);
+                const dayOfWeek = currentDate.getDay();
+                if (dayType === 'normal' || dayType === 'atestado') {
+                    const entrada = row.querySelector('.entrada').value;
+                    const saida = row.querySelector('.saida').value;
+                    if (!entrada && !saida) {
+                        const expectedWorkload = getDailyWorkloadForDay(employee, dayOfWeek);
+                        const expectedMinutes = (expectedWorkload.hours || employee.dailyWorkload || 8) * 60;
+                        const atestadoHours = parseFloat(row.querySelector('.atestado-hours')?.value) || 0;
+                        const requiredMinutes = dayType === 'atestado' ? expectedMinutes - (atestadoHours * 60) : expectedMinutes;
+                        row.querySelector('td:nth-child(8)').textContent = '00:00';
+                        const saldoCell = row.querySelector('td:nth-child(9)');
+                        saldoCell.textContent = formatMinutes(-requiredMinutes);
+                        saldoCell.className = requiredMinutes > 0 ? 'negative-balance' : 'positive-balance';
+                        updatedCount++;
+                    }
+                }
+            });
+            calculateMonthTotal();
+            if (updatedCount > 0) {
+                showNotification(`Saldos atualizados automaticamente para ${updatedCount} dias sem registro!`);
+                saveTimesheet();
+            } else {
+                showNotification('Nenhum dia sem registro encontrado para atualização.', 'info');
+            }
+        }
+
+        function getDailyWorkloadForDay(employee, dayOfWeek) {
+            if (employee.dailyWorkloads && employee.dailyWorkloads[dayOfWeek]) {
+                return employee.dailyWorkloads[dayOfWeek];
+            }
+            return {
+                start: employee.workdayStart || '08:00',
+                end: employee.workdayEnd || '17:00',
+                lunchStart: '12:00',
+                lunchEnd: '13:00',
+                hours: employee.dailyWorkload || 8,
+                dayOff: false
+            };
+        }
+
+        function checkIfHoliday(date) {
+            const dateStr = date.toISOString().split('T')[0];
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const day = date.getDate();
+            for (const holiday of holidays) {
+                const holidayDate = new Date(holiday.date);
+                if (holiday.recurring) {
+                    if (holidayDate.getMonth() === month && holidayDate.getDate() === day) {
+                        return holiday;
+                    }
+                } else {
+                    if (holidayDate.getFullYear() === year && 
+                        holidayDate.getMonth() === month && 
+                        holidayDate.getDate() === day) {
+                        return holiday;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // --- Funções de CRUD de funcionários e feriados (originais) ---
+        function updateEmployeeSelects() {
+            const employeeSelect = document.getElementById('employeeSelect');
+            const exportEmployeeSelect = document.getElementById('exportEmployee');
+            const importEmployeeSelect = document.getElementById('importEmployee');
+            while (employeeSelect.options.length > 1) employeeSelect.remove(1);
+            while (exportEmployeeSelect.options.length > 1) exportEmployeeSelect.remove(1);
+            while (importEmployeeSelect.options.length > 1) importEmployeeSelect.remove(1);
+            employees.forEach(employee => {
+                if (employee.status === 'ativo') {
+                    const option = document.createElement('option');
+                    option.value = employee.id;
+                    option.textContent = `${employee.name} (${employee.id})`;
+                    employeeSelect.appendChild(option);
+                    exportEmployeeSelect.appendChild(option.cloneNode(true));
+                    importEmployeeSelect.appendChild(option.cloneNode(true));
+                }
+            });
+            const firstActiveEmployee = employees.find(emp => emp.status === 'ativo');
+            if (firstActiveEmployee && !currentEmployeeId) {
+                currentEmployeeId = firstActiveEmployee.id;
+                employeeSelect.value = currentEmployeeId;
+            }
+        }
+
+        function renderEmployeesList() {
+            const employeesList = document.getElementById('employeesList');
+            if (employees.length === 0) {
+                employeesList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-user-friends"></i>
+                        <p>Nenhum funcionário cadastrado ainda. Use o formulário acima para adicionar.</p>
+                    </div>
+                `;
+                return;
+            }
+            employeesList.innerHTML = '';
+            employees.forEach(employee => {
+                const employeeCard = document.createElement('div');
+                employeeCard.className = 'employee-card';
+                const statusColors = { 'ativo': '#2e7d32', 'inativo': '#d32f2f', 'ferias': '#ff9800', 'afastado': '#9c27b0' };
+                employeeCard.style.borderLeftColor = statusColors[employee.status] || '#283593';
+                let daysOffText = 'Não definido';
+                if (employee.defaultDaysOff && employee.defaultDaysOff.length > 0) {
+                    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                    daysOffText = employee.defaultDaysOff.map(d => dayNames[d]).join(', ');
+                }
+                let dailyWorkloadText = '';
+                if (employee.dailyWorkloads && Object.keys(employee.dailyWorkloads).length > 0) {
+                    dailyWorkloadText = '<div><strong>Jornada personalizada:</strong> Configurada por dia</div>';
+                }
+                employeeCard.innerHTML = `
+                    <div class="employee-name">${employee.name}</div>
+                    <div class="employee-details">
+                        <div><strong>Matrícula:</strong> ${employee.id}</div>
+                        <div><strong>Cargo:</strong> ${employee.department || 'Não informado'}</div>
+                        <div><strong>Admissão:</strong> ${employee.admission ? formatDate(employee.admission) : 'Não informada'}</div>
+                        <div><strong>Horário padrão:</strong> ${employee.workdayStart || '08:00'} - ${employee.workdayEnd || '17:00'}</div>
+                        <div><strong>Jornada:</strong> ${employee.dailyWorkload || 8}h/dia, ${employee.weeklyWorkload || 44}h/semana</div>
+                        ${dailyWorkloadText}
+                        <div><strong>Folgas padrão:</strong> ${daysOffText}</div>
+                        <div><strong>Status:</strong> <span style="color: ${statusColors[employee.status] || '#333'}">${getStatusText(employee.status)}</span></div>
+                    </div>
+                    <div class="employee-actions">
+                        <button class="btn btn-sm btn-secondary edit-employee" data-id="${employee.id}">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-sm ${employee.status === 'ativo' ? 'btn-danger' : 'btn-success'} toggle-status" data-id="${employee.id}">
+                            <i class="fas fa-user${employee.status === 'ativo' ? '-slash' : '-check'}"></i> ${employee.status === 'ativo' ? 'Desativar' : 'Ativar'}
+                        </button>
+                    </div>
+                `;
+                employeesList.appendChild(employeeCard);
+            });
+            document.querySelectorAll('.edit-employee').forEach(button => {
+                button.addEventListener('click', function() {
+                    editEmployee(this.getAttribute('data-id'));
+                });
+            });
+            document.querySelectorAll('.toggle-status').forEach(button => {
+                button.addEventListener('click', function() {
+                    toggleEmployeeStatus(this.getAttribute('data-id'));
+                });
+            });
+        }
+
+        function getStatusText(status) {
+            const statusMap = { 'ativo': 'Ativo', 'inativo': 'Inativo', 'ferias': 'Férias', 'afastado': 'Afastado' };
+            return statusMap[status] || status;
+        }
+
+        async function handleEmployeeForm(e) {
+            e.preventDefault();
+            const editId = document.getElementById('employeeEditId').value;
+            const isEdit = editId !== '';
+            const name = document.getElementById('employeeName').value;
+            const id = isEdit ? editId : document.getElementById('employeeId').value;
+            const department = document.getElementById('employeeDepartment').value;
+            const email = document.getElementById('employeeEmail').value;
+            const admission = document.getElementById('employeeAdmission').value;
+            const status = document.getElementById('employeeStatus').value;
+            const workdayStart = document.getElementById('workdayStart').value;
+            const workdayEnd = document.getElementById('workdayEnd').value;
+            const dailyWorkload = parseFloat(document.getElementById('dailyWorkload').value) || 8;
+            const weeklyWorkload = parseFloat(document.getElementById('weeklyWorkload').value) || 44;
+            const monthlyWorkload = parseFloat(document.getElementById('monthlyWorkload').value) || 220;
+            const daysOffSelect = document.getElementById('employeeFolgas');
+            const defaultDaysOff = Array.from(daysOffSelect.selectedOptions).map(option => parseInt(option.value));
+            const dailyWorkloads = {};
+            for (let i = 0; i < 7; i++) {
+                const start = document.getElementById(`dailyStart_${i}`).value;
+                const lunchStart = document.getElementById(`dailyLunchStart_${i}`).value;
+                const lunchEnd = document.getElementById(`dailyLunchEnd_${i}`).value;
+                const end = document.getElementById(`dailyEnd_${i}`).value;
+                const hours = document.getElementById(`dailyHours_${i}`).value ? parseFloat(document.getElementById(`dailyHours_${i}`).value) : 0;
+                const dayOff = document.getElementById(`dailyDayOff_${i}`).checked;
+                if (start || end || lunchStart || lunchEnd || hours > 0) {
+                    dailyWorkloads[i] = { start, lunchStart, lunchEnd, end, hours, dayOff };
+                }
+            }
+            if (isEdit) {
+                const employeeIndex = employees.findIndex(emp => emp.id === editId);
+                if (employeeIndex !== -1) {
+                    const updatedEmployee = {
+                        ...employees[employeeIndex],
+                        name, department, email, admission, status, workdayStart, workdayEnd,
+                        dailyWorkload, weeklyWorkload, monthlyWorkload, defaultDaysOff,
+                        dailyWorkloads: Object.keys(dailyWorkloads).length > 0 ? dailyWorkloads : null
+                    };
+                    employees[employeeIndex] = updatedEmployee;
+                    await put(STORES.EMPLOYEES, updatedEmployee);
+                    updateEmployeeSelects();
+                    renderEmployeesList();
+                    document.getElementById('employeeModal').style.display = 'none';
+                    showNotification('Funcionário atualizado com sucesso!');
+                }
+            } else {
+                if (employees.some(emp => emp.id === id)) {
+                    showNotification('Matrícula já cadastrada! Use uma matrícula diferente.', 'error');
+                    return;
+                }
+                const employee = {
+                    name, id, department, email, admission, status, workdayStart, workdayEnd,
+                    dailyWorkload, weeklyWorkload, monthlyWorkload, defaultDaysOff,
+                    dailyWorkloads: Object.keys(dailyWorkloads).length > 0 ? dailyWorkloads : null
+                };
+                employees.push(employee);
+                await put(STORES.EMPLOYEES, employee);
+                updateEmployeeSelects();
+                renderEmployeesList();
+                document.getElementById('employeeModal').style.display = 'none';
+                showNotification('Funcionário cadastrado com sucesso!');
+            }
+        }
+
+        function editEmployee(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) return;
+            const employeeModal = document.getElementById('employeeModal');
+            employeeModal.style.display = 'block';
+            isEditingEmployee = true;
+            document.getElementById('employeeEditId').value = employee.id;
+            document.getElementById('employeeName').value = employee.name;
+            document.getElementById('employeeId').value = employee.id;
+            document.getElementById('employeeId').disabled = true;
+            document.getElementById('employeeDepartment').value = employee.department || '';
+            document.getElementById('employeeEmail').value = employee.email || '';
+            document.getElementById('employeeAdmission').value = employee.admission || '';
+            document.getElementById('employeeStatus').value = employee.status || 'ativo';
+            document.getElementById('workdayStart').value = employee.workdayStart || '08:00';
+            document.getElementById('workdayEnd').value = employee.workdayEnd || '17:00';
+            document.getElementById('dailyWorkload').value = employee.dailyWorkload || 8;
+            document.getElementById('weeklyWorkload').value = employee.weeklyWorkload || 44;
+            document.getElementById('monthlyWorkload').value = employee.monthlyWorkload || 220;
+            const daysOffSelect = document.getElementById('employeeFolgas');
+            Array.from(daysOffSelect.options).forEach(option => {
+                option.selected = employee.defaultDaysOff && employee.defaultDaysOff.includes(parseInt(option.value));
+            });
+            if (employee.dailyWorkloads) {
+                for (let i = 0; i < 7; i++) {
+                    if (employee.dailyWorkloads[i]) {
+                        const config = employee.dailyWorkloads[i];
+                        document.getElementById(`dailyStart_${i}`).value = config.start || '';
+                        document.getElementById(`dailyLunchStart_${i}`).value = config.lunchStart || '';
+                        document.getElementById(`dailyLunchEnd_${i}`).value = config.lunchEnd || '';
+                        document.getElementById(`dailyEnd_${i}`).value = config.end || '';
+                        document.getElementById(`dailyHours_${i}`).value = config.hours || '';
+                        document.getElementById(`dailyDayOff_${i}`).checked = config.dayOff || false;
+                        const checkbox = document.getElementById(`dailyDayOff_${i}`);
+                        const row = checkbox.closest('.daily-workload-row');
+                        const inputs = row.querySelectorAll('input:not(.day-off-checkbox)');
+                        inputs.forEach(input => { input.disabled = config.dayOff || false; });
+                    }
+                }
+            } else {
+                document.getElementById('resetDailyConfig').click();
+            }
+            const submitBtn = document.getElementById('employeeSubmitBtn');
+            submitBtn.innerHTML = '<i class="fas fa-user-edit"></i> Atualizar Funcionário';
+            submitBtn.className = 'btn btn-warning';
+            showNotification('Funcionário carregado para edição. Atualize os dados e clique em Atualizar.', 'info');
+        }
+
+        async function toggleEmployeeStatus(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) return;
+            employee.status = employee.status === 'ativo' ? 'inativo' : 'ativo';
+            await put(STORES.EMPLOYEES, employee);
+            updateEmployeeSelects();
+            renderEmployeesList();
+            showNotification(`Funcionário ${employee.status === 'ativo' ? 'ativado' : 'desativado'} com sucesso!`);
+        }
+
+        async function addHoliday(e) {
+            e.preventDefault();
+            const name = document.getElementById('holidayName').value;
+            const type = document.getElementById('holidayType').value;
+            const date = document.getElementById('holidayDate').value;
+            const recurring = document.getElementById('holidayRecurring').value === 'true';
+            const description = document.getElementById('holidayDescription').value;
+            const existingHoliday = holidays.find(h => h.date === date && h.name === name);
+            if (existingHoliday) {
+                showNotification('Já existe um feriado/folga cadastrado com este nome e data!', 'warning');
+                return;
+            }
+            const holiday = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name, type, date, recurring, description
+            };
+            holidays.push(holiday);
+            await put(STORES.HOLIDAYS, holiday);
+            renderHolidaysList();
+            document.getElementById('holidayModal').style.display = 'none';
+            showNotification(`${type === 'feriado' ? 'Feriado' : 'Folga'} cadastrado com sucesso!`);
+            if (currentEmployeeId) {
+                const selectedDate = new Date(date);
+                if (selectedDate.getFullYear() === currentYear && selectedDate.getMonth() === currentMonth) {
+                    generateCalendar();
+                }
+            }
+        }
+
+        async function applyMassLeave() {
+            const startDate = document.getElementById('massStartDate').value;
+            const endDate = document.getElementById('massEndDate').value;
+            const type = document.getElementById('massType').value;
+            const reason = document.getElementById('massReason').value;
+            if (!startDate || !endDate || !reason) {
+                showNotification('Preencha todas as informações para aplicar folgas em massa!', 'error');
+                return;
+            }
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            if (start > end) {
+                showNotification('A data inicial não pode ser maior que a data final!', 'error');
+                return;
+            }
+            const days = [];
+            const currentDate = new Date(start);
+            while (currentDate <= end) {
+                days.push(new Date(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            if (days.length === 0) {
+                showNotification('Nenhum dia selecionado!', 'warning');
+                return;
+            }
+            if (!confirm(`Deseja aplicar ${type} para todos os funcionários do dia ${formatDate(startDate)} ao dia ${formatDate(endDate)}? (${days.length} dias)`)) {
+                return;
+            }
+            for (const day of days) {
+                const dateStr = day.toISOString().split('T')[0];
+                const holidayName = `${reason} (${formatDate(dateStr)})`;
+                const existingHoliday = holidays.find(h => h.date === dateStr && h.name === holidayName);
+                if (!existingHoliday) {
+                    const holiday = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: holidayName,
+                        type: type,
+                        date: dateStr,
+                        recurring: false,
+                        description: `Aplicado em massa: ${reason}`
+                    };
+                    holidays.push(holiday);
+                    await put(STORES.HOLIDAYS, holiday);
+                }
+            }
+            renderHolidaysList();
+            document.getElementById('massStartDate').value = '';
+            document.getElementById('massEndDate').value = '';
+            document.getElementById('massReason').value = '';
+            showNotification(`${days.length} dias de ${type} aplicados em massa com sucesso!`);
+            if (currentEmployeeId) generateCalendar();
+        }
+
+        async function renderHolidaysList() {
+            const holidaysList = document.getElementById('holidaysList');
+            const filterYear = document.getElementById('filterYear').value;
+            let filteredHolidays = holidays;
+            if (filterYear !== 'all') {
+                filteredHolidays = holidays.filter(h => {
+                    const year = new Date(h.date).getFullYear();
+                    return year == filterYear || h.recurring;
+                });
+            }
+            if (filteredHolidays.length === 0) {
+                holidaysList.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fas fa-calendar-times"></i>
+                        <p>Nenhum feriado encontrado para o ano selecionado.</p>
+                    </div>
+                `;
+                return;
+            }
+            filteredHolidays.sort((a, b) => new Date(a.date) - new Date(b.date));
+            holidaysList.innerHTML = '';
+            filteredHolidays.forEach(holiday => {
+                const holidayDate = new Date(holiday.date);
+                const dayOfWeek = getDayName(holidayDate.getDay());
+                const dateFormatted = formatDate(holiday.date);
+                const typeColors = { 'feriado': '#ff9800', 'folga': '#4caf50', 'recesso': '#2196f3' };
+                const typeTexts = { 'feriado': 'Feriado', 'folga': 'Folga', 'recesso': 'Recesso' };
+                const holidayItem = document.createElement('div');
+                holidayItem.className = 'employee-card';
+                holidayItem.style.borderLeftColor = typeColors[holiday.type] || '#283593';
+                holidayItem.style.marginBottom = '10px';
+                holidayItem.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">${holiday.name}</div>
+                            <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
+                                <i class="far fa-calendar"></i> ${dateFormatted} (${dayOfWeek}) 
+                                <span style="margin-left: 10px; color: ${typeColors[holiday.type]}; font-weight: bold;">
+                                    ${typeTexts[holiday.type]}
+                                </span>
+                                ${holiday.recurring ? '<span style="margin-left: 10px; color: #9c27b0;">(Recorrente)</span>' : ''}
+                            </div>
+                            ${holiday.description ? `<div style="color: #777; font-size: 13px;">${holiday.description}</div>` : ''}
+                        </div>
+                        <button class="btn btn-sm btn-danger delete-holiday" data-id="${holiday.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                holidaysList.appendChild(holidayItem);
+            });
+            document.querySelectorAll('.delete-holiday').forEach(button => {
+                button.addEventListener('click', async function() {
+                    await deleteHoliday(this.getAttribute('data-id'));
+                });
+            });
+        }
+
+        async function deleteHoliday(holidayId) {
+            if (!confirm('Tem certeza que deseja excluir este feriado/folga?')) return;
+            holidays = holidays.filter(h => h.id !== holidayId);
+            await deleteItem(STORES.HOLIDAYS, holidayId);
+            renderHolidaysList();
+            showNotification('Feriado/folga excluído com sucesso!');
+            if (currentEmployeeId) generateCalendar();
+        }
+
+        // --- Funções de exportação/importação (originais, mantidas) ---
+        function exportCurrentTimesheet() {
+            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            const savedData = timesheets[timesheetKey];
+            if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            const monthName = getMonthName(month);
+            const totalMonthHours = document.getElementById('totalMonthHours').textContent;
+            const totalMonthBalance = document.getElementById('totalMonthBalance').textContent;
+            const totalFolgas = document.getElementById('totalFolgas').textContent;
+            const totalFeriados = document.getElementById('totalFeriados').textContent;
+            const totalAtestados = document.getElementById('totalAtestados').textContent;
+            const totalFaltas = document.getElementById('totalFaltas').textContent;
+            const data = [];
+            data.push([`Registro de Ponto - ${employee.name}`, ...Array(9).fill('')]);
+            data.push([`Mês/Ano: ${monthName}/${year}`, ...Array(9).fill('')]);
+            data.push([]);
+            data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
+                const formatTime = (time) => !time ? '' : time.length === 5 ? time + ':00' : time;
+                data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total || '', dayData.balance || '', dayData.dayType, dayData.dayTypeText || '', dayData.atestadoHours || '']);
+            }
+            data.push([]);
+            data.push(["Total Horas Normais:", "", "", "", "", totalMonthHours, "", "", "", ""]);
+            data.push(["Saldo do Mês:", "", "", "", "", totalMonthBalance, "", "", "", ""]);
+            data.push(["Folgas:", totalFolgas, "Feriados:", totalFeriados, "Atestados:", totalAtestados, "Faltas:", totalFaltas, "", ""]);
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wscols = [{wch:6},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
+            ws['!cols'] = wscols;
+            if (!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } });
+            ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } });
+            XLSX.utils.book_append_sheet(wb, ws, "Ponto Mensal");
+            const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showNotification('Arquivo Excel exportado com layout moderno!');
+        }
+
+        function exportCurrentTimesheetPDF() {
+            if (!currentEmployeeId) { showNotification('Selecione um funcionário primeiro!', 'error'); return; }
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
+            const savedData = timesheets[timesheetKey];
+            if (!savedData) { showNotification('Não há dados salvos para este mês!', 'warning'); return; }
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            const monthName = getMonthName(month);
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const marginLeft = 15, marginRight = 15, marginTop = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('ESPELHO DE PONTO MENSAL', pageWidth/2, marginTop, { align: 'center' });
+            doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
+            doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
+            doc.text(`Mês/Ano: ${monthName}/${year}`, pageWidth-marginRight, yPos, { align: 'right' });
+            yPos += 8; doc.text(`Matrícula: ${employee.id}`, marginLeft, yPos);
+            let workloadText = `Jornada: ${employee.dailyWorkload || 8}h/dia`;
+            if (employee.dailyWorkloads) workloadText += ' (Personalizada por dia)';
+            doc.text(workloadText, pageWidth-marginRight, yPos, { align: 'right' });
+            yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
+            doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align: 'right' });
+            yPos += 10; doc.setDrawColor(200,200,200); doc.line(marginLeft, yPos, pageWidth-marginRight, yPos); yPos += 5;
+            const headers = [["Dia", "Dia Semana", "Tipo", "Entrada", "Saída Int.", "Volta Int.", "Saída", "Total", "Saldo", "Atestado (h)"]];
+            const daysInMonth = new Date(year, month+1, 0).getDate();
+            const tableData = [];
+            let totalHorasNormais = 0, totalSaldo = 0, totalFolgas = 0, totalFeriados = 0, totalAtestados = 0, totalFaltas = 0;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(year, month, day);
+                const dayName = getDayName(currentDate.getDay());
+                const dayData = savedData[day] || { entrada: '', saidaIntervalo: '', voltaIntervalo: '', saida: '', dayType: 'normal', dayTypeText: '', atestadoHours: '', total: '', balance: '' };
+                let tipoDia = 'Normal';
+                if (dayData.dayType === 'folga') { tipoDia = 'Folga'; totalFolgas++; }
+                else if (dayData.dayType === 'feriado') { tipoDia = 'Feriado'; totalFeriados++; }
+                else if (dayData.dayType === 'atestado') { tipoDia = 'Atestado'; totalAtestados++; }
+                else if (dayData.dayType === 'falta') { tipoDia = 'Falta'; totalFaltas++; }
+                if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                    if (dayData.total) {
+                        const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
+                        totalHorasNormais += hours*60 + minutes;
+                    }
+                    if (dayData.balance && dayData.balance.trim() !== '') {
+                        const isNegative = dayData.balance.startsWith('-');
+                        const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
+                        totalSaldo += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
+                    }
+                }
+                tableData.push([day.toString(), dayName, tipoDia, dayData.entrada||'', dayData.saidaIntervalo||'', dayData.voltaIntervalo||'', dayData.saida||'', dayData.total||'', dayData.balance||'', dayData.atestadoHours||'']);
+            }
+            doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:8, cellPadding:2 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
+            const finalY = doc.lastAutoTable.finalY + 10;
+            doc.setFontSize(12); doc.setTextColor(40,53,147); doc.text('RESUMO DO MÊS', marginLeft, finalY);
+            doc.setFontSize(10); doc.setTextColor(0,0,0);
+            const formatMinutesToHours = (minutes) => { const sign = minutes<0?'-':'+'; const abs = Math.abs(minutes); const h = Math.floor(abs/60); const m = abs%60; return `${sign}${h}h ${m}m`; };
+            let resumoY = finalY + 8;
+            doc.text(`Horas Trabalhadas: ${formatMinutesToHours(totalHorasNormais)}`, marginLeft, resumoY);
+            doc.text(`Saldo Total: ${formatMinutesToHours(totalSaldo)}`, marginLeft+60, resumoY);
+            resumoY += 6; doc.text(`Folgas: ${totalFolgas} dias`, marginLeft, resumoY); doc.text(`Feriados: ${totalFeriados} dias`, marginLeft+60, resumoY);
+            resumoY += 6; doc.text(`Atestados: ${totalAtestados} dias`, marginLeft, resumoY); doc.text(`Faltas: ${totalFaltas} dias`, marginLeft+60, resumoY);
+            const footerY = doc.internal.pageSize.getHeight() - 20;
+            doc.setFontSize(8); doc.setTextColor(128,128,128); doc.text('Sistema de Ponto Completo - Documento gerado automaticamente', pageWidth/2, footerY, { align:'center' });
+            const assinaturaY = footerY - 20;
+            doc.setFontSize(10); doc.setTextColor(0,0,0); doc.line(marginLeft, assinaturaY, marginLeft+60, assinaturaY); doc.line(pageWidth-marginRight-60, assinaturaY, pageWidth-marginRight, assinaturaY);
+            doc.text('Assinatura do Funcionário', marginLeft+30, assinaturaY+5, { align:'center' }); doc.text('Assinatura do Responsável', pageWidth-marginRight-30, assinaturaY+5, { align:'center' });
+            const fileName = `Espelho_Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.pdf`;
+            doc.save(fileName);
+            showNotification('PDF gerado com sucesso!');
+        }
+
+        function exportConsolidatedReportPDF() {
+            const employeeId = document.getElementById('exportEmployee').value;
+            const month = document.getElementById('exportMonth').value;
+            const year = document.getElementById('exportYear').value;
+            if (employeeId === 'all') { showNotification('Selecione um funcionário específico para o relatório consolidado!', 'error'); return; }
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
+            const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
+            if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
+            employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
+            let filteredSheets = employeeSheets;
+            if (month !== 'all' || year !== 'all') {
+                filteredSheets = employeeSheets.filter(key => { const [id,sY,sM]=key.split('-'); return (month==='all' || sM===month) && (year==='all' || sY===year); });
+            }
+            if (filteredSheets.length === 0) { showNotification('Nenhum registro encontrado para os filtros selecionados!', 'warning'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const marginLeft = 15, marginRight = 15, marginTop = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            doc.setFontSize(20); doc.setTextColor(40,53,147); doc.text('RELATÓRIO CONSOLIDADO DE PONTO', pageWidth/2, marginTop, { align:'center' });
+            doc.setFontSize(12); doc.setTextColor(0,0,0); let yPos = marginTop+10;
+            doc.text(`Funcionário: ${employee.name}`, marginLeft, yPos);
+            doc.text(`Matrícula: ${employee.id}`, pageWidth-marginRight, yPos, { align:'right' });
+            yPos += 8; doc.text(`Departamento: ${employee.department || 'Não informado'}`, marginLeft, yPos);
+            doc.text(`Período: ${month!=='all'?getMonthName(parseInt(month))+'/':''}${year!=='all'?year:'Todos'}`, pageWidth-marginRight, yPos, { align:'right' });
+            yPos += 8; doc.text(`Jornada: ${employee.dailyWorkload||8}h/dia, ${employee.weeklyWorkload||44}h/semana`, marginLeft, yPos);
+            doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth-marginRight, yPos, { align:'right' });
+            yPos += 5;
+            const headers = [["Mês/Ano", "Dias Úteis", "Horas Trabalhadas", "Saldo Total", "Folgas", "Feriados", "Atestados", "Faltas"]];
+            const tableData = [];
+            let totalGeralHorasTrabalhadas = 0, totalGeralSaldo = 0, totalGeralDiasUteis = 0, totalGeralFolgas = 0, totalGeralFeriados = 0, totalGeralAtestados = 0, totalGeralFaltas = 0;
+            filteredSheets.forEach(key => {
+                const [empId, sheetYear, sheetMonth] = key.split('-');
+                const monthName = getMonthName(parseInt(sheetMonth));
+                const daysData = timesheets[key];
+                let horasTrabalhadasMes = 0, saldoMes = 0, diasUteisMes = 0, folgasMes = 0, feriadosMes = 0, atestadosMes = 0, faltasMes = 0;
+                const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayData = daysData && daysData[day] ? daysData[day] : { dayType:'normal', total:'', balance:'' };
+                    if (dayData.dayType === 'normal' || dayData.dayType === 'atestado') {
+                        diasUteisMes++;
+                        if (dayData.total && dayData.total.trim()!=='') {
+                            const [hours, minutes] = dayData.total.replace(/[+-]/, '').split(':').map(Number);
+                            horasTrabalhadasMes += hours*60 + minutes;
+                        }
+                        if (dayData.balance && dayData.balance.trim()!=='') {
+                            const isNegative = dayData.balance.startsWith('-');
+                            const [bHours, bMinutes] = dayData.balance.replace(/[+-]/, '').split(':').map(Number);
+                            saldoMes += (isNegative ? -1 : 1) * (bHours*60 + bMinutes);
+                        }
+                    } else if (dayData.dayType === 'folga') folgasMes++;
+                    else if (dayData.dayType === 'feriado') feriadosMes++;
+                    else if (dayData.dayType === 'atestado') atestadosMes++;
+                    else if (dayData.dayType === 'falta') faltasMes++;
+                }
+                tableData.push([`${monthName}/${sheetYear}`, diasUteisMes.toString(), formatMinutesToHM(horasTrabalhadasMes), formatMinutesToHM(saldoMes, true), folgasMes.toString(), feriadosMes.toString(), atestadosMes.toString(), faltasMes.toString()]);
+                totalGeralHorasTrabalhadas += horasTrabalhadasMes;
+                totalGeralSaldo += saldoMes;
+                totalGeralDiasUteis += diasUteisMes;
+                totalGeralFolgas += folgasMes;
+                totalGeralFeriados += feriadosMes;
+                totalGeralAtestados += atestadosMes;
+                totalGeralFaltas += faltasMes;
+            });
+            tableData.push(["TOTAL GERAL", totalGeralDiasUteis.toString(), formatMinutesToHM(totalGeralHorasTrabalhadas), formatMinutesToHM(totalGeralSaldo, true), totalGeralFolgas.toString(), totalGeralFeriados.toString(), totalGeralAtestados.toString(), totalGeralFaltas.toString()]);
+            doc.autoTable({ startY: yPos, head: headers, body: tableData, margin: { left: marginLeft, right: marginRight }, styles: { fontSize:9 }, headStyles: { fillColor:[40,53,147], textColor:[255,255,255] }, alternateRowStyles: { fillColor:[245,245,245] }, theme:'grid' });
+            const fileName = `Relatorio_Consolidado_${employee.name.replace(/\s+/g, '_')}_${month!=='all'?getMonthName(parseInt(month)):''}${year!=='all'?year:''}.pdf`;
+            doc.save(fileName);
+            showNotification('Relatório consolidado gerado com sucesso!');
+        }
+
+        function exportAllMonthsPDF() {
+            const employeeId = document.getElementById('exportEmployee').value;
+            if (employeeId === 'all') { showNotification('Selecione um funcionário específico!', 'error'); return; }
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) { showNotification('Funcionário não encontrado!', 'error'); return; }
+            const employeeSheets = Object.keys(timesheets).filter(key => key.startsWith(employee.id));
+            if (employeeSheets.length === 0) { showNotification('Nenhum registro encontrado para este funcionário!', 'warning'); return; }
+            employeeSheets.sort((a,b) => { const [idA,yA,mA]=a.split('-'); const [idB,yB,mB]=b.split('-'); if(yA!==yB) return yA-yB; return mA-mB; });
+            employeeSheets.forEach((key, index) => {
+                const [empId, year, month] = key.split('-');
+                const originalEmployeeId = currentEmployeeId;
+                const originalMonth = currentMonth;
+                const originalYear = currentYear;
+                currentEmployeeId = employeeId;
+                currentMonth = parseInt(month);
+                currentYear = parseInt(year);
+                setTimeout(() => {
+                    exportCurrentTimesheetPDF();
+                    if (index === employeeSheets.length - 1) {
+                        currentEmployeeId = originalEmployeeId;
+                        currentMonth = originalMonth;
+                        currentYear = originalYear;
+                        if (originalEmployeeId) {
+                            document.getElementById('monthSelect').value = originalMonth;
+                            document.getElementById('yearSelect').value = originalYear;
+                            document.getElementById('employeeSelect').value = originalEmployeeId;
+                            generateCalendar();
+                        }
+                    }
+                }, index * 1000);
+            });
+            showNotification(`Gerando ${employeeSheets.length} PDF(s)... Aguarde os downloads.`);
+        }
+
+        function exportToExcel() {
+            const employeeId = document.getElementById('exportEmployee').value;
+            const month = document.getElementById('exportMonth').value;
+            const year = document.getElementById('exportYear').value;
+            const wb = XLSX.utils.book_new();
+            if (employeeId === 'all') {
+                employees.forEach(employee => {
+                    Object.keys(timesheets).forEach(key => {
+                        if (key.startsWith(employee.id)) {
+                            const [empId, sheetYear, sheetMonth] = key.split('-');
+                            if ((month === 'all' || sheetMonth === month) && (year === 'all' || sheetYear === year)) {
+                                const monthName = getMonthName(parseInt(sheetMonth));
+                                const daysData = timesheets[key];
+                                const data = [["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]];
+                                const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
+                                for (let day = 1; day <= daysInMonth; day++) {
+                                    const dayData = daysData[day] || { entrada:'', saidaIntervalo:'', voltaIntervalo:'', saida:'', dayType:'normal', dayTypeText:'', atestadoHours:'', total:'', balance:'' };
+                                    const formatTime = (time) => !time ? '' : time.length === 5 ? time+':00' : time;
+                                    data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total||'', dayData.balance||'', dayData.dayType, dayData.dayTypeText||'', dayData.atestadoHours||'']);
+                                }
+                                const ws = XLSX.utils.aoa_to_sheet(data);
+                                const wscols = [{wch:5},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
+                                ws['!cols'] = wscols;
+                                const sheetName = `${employee.name.substring(0,15)}_${monthName}_${sheetYear}`.substring(0,31);
+                                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                            }
+                        }
+                    });
+                });
+            } else {
+                Object.keys(timesheets).forEach(key => {
+                    if (key.startsWith(employeeId)) {
+                        const [empId, sheetYear, sheetMonth] = key.split('-');
+                        if ((month === 'all' || sheetMonth === month) && (year === 'all' || sheetYear === year)) {
+                            const employee = employees.find(emp => emp.id === empId);
+                            const monthName = getMonthName(parseInt(sheetMonth));
+                            const daysData = timesheets[key];
+                            const data = [["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]];
+                            const daysInMonth = new Date(sheetYear, parseInt(sheetMonth)+1, 0).getDate();
+                            for (let day = 1; day <= daysInMonth; day++) {
+                                const dayData = daysData[day] || { entrada:'', saidaIntervalo:'', voltaIntervalo:'', saida:'', dayType:'normal', dayTypeText:'', atestadoHours:'', total:'', balance:'' };
+                                const formatTime = (time) => !time ? '' : time.length === 5 ? time+':00' : time;
+                                data.push([day, formatTime(dayData.entrada), formatTime(dayData.saidaIntervalo), formatTime(dayData.voltaIntervalo), formatTime(dayData.saida), dayData.total||'', dayData.balance||'', dayData.dayType, dayData.dayTypeText||'', dayData.atestadoHours||'']);
+                            }
+                            const ws = XLSX.utils.aoa_to_sheet(data);
+                            const wscols = [{wch:5},{wch:10},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12}];
+                            ws['!cols'] = wscols;
+                            const sheetName = `${monthName}_${sheetYear}`;
+                            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        }
+                    }
+                });
+            }
+            if (wb.SheetNames.length === 0) { showNotification('Nenhum dado encontrado para exportar!', 'warning'); return; }
+            const fileName = `Registro_Ponto_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showNotification('Dados exportados com sucesso!');
+        }
+
+        function importFromExcel() {
+            const employeeId = document.getElementById('importEmployee').value;
+            const fileInput = document.getElementById('importFile');
+            if (!employeeId) { showNotification('Selecione um funcionário para importação!', 'error'); return; }
+            if (!fileInput.files.length) { showNotification('Selecione um arquivo Excel para importar!', 'error'); return; }
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type:'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header:1});
+                    if (jsonData.length < 2) throw new Error('Arquivo sem dados');
+                    const month = parseInt(prompt("Digite o número do mês (1-12):", new Date().getMonth()+1)) - 1;
+                    const year = parseInt(prompt("Digite o ano:", new Date().getFullYear()));
+                    if (isNaN(month) || month<0 || month>11 || isNaN(year)) throw new Error('Mês ou ano inválido');
+                    const timesheetKey = `${employeeId}-${year}-${month}`;
+                    const daysData = {};
+                    for (let i=1; i<jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row.length >= 5) {
+                            const day = parseInt(row[0]);
+                            const formatTimeFromExcel = (excelTime) => {
+                                if (!excelTime) return '';
+                                if (typeof excelTime === 'number') {
+                                    const totalSeconds = Math.floor(excelTime * 24 * 60 * 60);
+                                    const hours = Math.floor(totalSeconds / 3600);
+                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+                                }
+                                const timeStr = String(excelTime);
+                                if (timeStr.includes(':')) {
+                                    const parts = timeStr.split(':');
+                                    return `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}`;
+                                }
+                                return '';
+                            };
+                            const dayData = {
+                                entrada: formatTimeFromExcel(row[1]),
+                                saidaIntervalo: formatTimeFromExcel(row[2]),
+                                voltaIntervalo: formatTimeFromExcel(row[3]),
+                                saida: formatTimeFromExcel(row[4]),
+                                dayType: row[7] ? row[7].toLowerCase() : 'normal',
+                                dayTypeText: row[8] || '',
+                                atestadoHours: row[9] || '',
+                                total: '',
+                                balance: ''
+                            };
+                            if (dayData.entrada && dayData.saida && (dayData.dayType==='normal'||dayData.dayType==='atestado')) {
+                                const employee = employees.find(emp => emp.id === employeeId);
+                                if (employee) {
+                                    const currentDate = new Date(year, month, day);
+                                    const dayOfWeek = currentDate.getDay();
+                                    const resultado = calculateDailyBalance(dayData, employee, dayOfWeek);
+                                    dayData.total = resultado.total;
+                                    dayData.balance = resultado.balance;
+                                }
+                            }
+                            daysData[day] = dayData;
+                        }
+                    }
+                    timesheets[timesheetKey] = daysData;
+                    saveTimesheet(timesheetKey, daysData).then(() => {
+                        showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
+                        fileInput.value = '';
+                        if (employeeId === currentEmployeeId && month === parseInt(document.getElementById('monthSelect').value) && year === parseInt(document.getElementById('yearSelect').value)) {
+                            generateCalendar();
+                        }
+                    });
+                } catch (error) {
+                    showNotification('Erro ao importar arquivo: ' + error.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function exportBackup() {
+            const backupData = { employees, timesheets, holidays, exportDate: new Date().toISOString(), version: '5.0-indexeddb' };
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `backup_ponto_completo_${new Date().toISOString().split('T')[0]}.json`;
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            showNotification('Backup exportado com sucesso!');
+        }
+
+        async function importBackupMerge() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const backupData = JSON.parse(e.target.result);
+                        if (!backupData.employees || !backupData.timesheets || !backupData.holidays) throw new Error('Formato de arquivo inválido');
+                        let addedEmployees = 0, updatedEmployees = 0, addedTimesheets = 0, updatedTimesheets = 0, addedHolidays = 0;
+                        for (const backupEmp of backupData.employees) {
+                            const existingIndex = employees.findIndex(emp => emp.id === backupEmp.id);
+                            if (existingIndex === -1) {
+                                employees.push(backupEmp);
+                                await put(STORES.EMPLOYEES, backupEmp);
+                                addedEmployees++;
+                            } else {
+                                const existingEmp = employees[existingIndex];
+                                const mergedEmp = { ...backupEmp, ...existingEmp };
+                                employees[existingIndex] = mergedEmp;
+                                await put(STORES.EMPLOYEES, mergedEmp);
+                                updatedEmployees++;
+                            }
+                        }
+                        for (const backupHoliday of backupData.holidays) {
+                            const existingHoliday = holidays.find(h => h.id === backupHoliday.id || (h.name === backupHoliday.name && h.date === backupHoliday.date));
+                            if (!existingHoliday) {
+                                holidays.push(backupHoliday);
+                                await put(STORES.HOLIDAYS, backupHoliday);
+                                addedHolidays++;
+                            }
+                        }
+                        for (const [key, backupDays] of Object.entries(backupData.timesheets)) {
+                            if (!timesheets[key]) {
+                                timesheets[key] = backupDays;
+                                await saveTimesheet(key, backupDays);
+                                addedTimesheets++;
+                            } else {
+                                const existingDays = timesheets[key];
+                                let daysAdded = 0, daysUpdated = 0;
+                                for (const [day, backupDay] of Object.entries(backupDays)) {
+                                    if (!existingDays[day]) {
+                                        existingDays[day] = backupDay;
+                                        daysAdded++;
+                                    } else if (backupDay.entrada && backupDay.saida && (!existingDays[day].entrada || !existingDays[day].saida)) {
+                                        existingDays[day] = backupDay;
+                                        daysUpdated++;
+                                    } else if (backupDay.dayType !== 'normal' && existingDays[day].dayType === 'normal') {
+                                        existingDays[day].dayType = backupDay.dayType;
+                                        existingDays[day].dayTypeText = backupDay.dayTypeText;
+                                        existingDays[day].atestadoHours = backupDay.atestadoHours || '';
+                                        daysUpdated++;
+                                    }
+                                }
+                                if (daysAdded>0 || daysUpdated>0) {
+                                    updatedTimesheets++;
+                                    await saveTimesheet(key, existingDays);
+                                }
+                            }
+                        }
+                        if (addedEmployees>0 || updatedEmployees>0 || addedTimesheets>0 || updatedTimesheets>0 || addedHolidays>0) {
+                            updateEmployeeSelects();
+                            renderEmployeesList();
+                            renderHolidaysList();
+                            if (currentEmployeeId) generateCalendar();
+                            let message = 'Backup mesclado com sucesso! ';
+                            if (addedEmployees>0) message += `Adicionados: ${addedEmployees} funcionários. `;
+                            if (updatedEmployees>0) message += `Atualizados: ${updatedEmployees} funcionários. `;
+                            if (addedTimesheets>0) message += `Adicionados: ${addedTimesheets} registros de ponto. `;
+                            if (updatedTimesheets>0) message += `Atualizados: ${updatedTimesheets} registros de ponto. `;
+                            if (addedHolidays>0) message += `Adicionados: ${addedHolidays} feriados.`;
+                            showNotification(message.trim());
+                        } else {
+                            showNotification('Nenhum novo dado encontrado no backup. Todos os dados já existem no sistema.', 'warning');
+                        }
+                    } catch (error) {
+                        showNotification('Erro ao restaurar backup: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        async function clearAllData() {
+            if (!confirm('Isso apagará TODOS os dados (funcionários, registros e feriados). Tem certeza?')) return;
+            await clearStore(STORES.EMPLOYEES);
+            await clearStore(STORES.TIMESHEETS);
+            await clearStore(STORES.HOLIDAYS);
+            employees = [];
+            timesheets = {};
+            holidays = generateHolidaysFromBase(null);
+            for (const h of holidays) {
+                await put(STORES.HOLIDAYS, h);
+            }
+            currentEmployeeId = '';
+            updateEmployeeSelects();
+            renderEmployeesList();
+            renderHolidaysList();
+            document.getElementById('timesheetBody').innerHTML = `<tr><td colspan="10" class="empty-state"><i class="fas fa-calendar-day"></i><p>Selecione um funcionário, mês e ano para começar</p></td></tr>`;
+            document.getElementById('totalMonthHours').textContent = '00:00';
+            document.getElementById('totalMonthBalance').textContent = '00:00';
+            document.getElementById('totalFolgas').textContent = '0';
+            document.getElementById('totalFeriados').textContent = '0';
+            document.getElementById('totalAtestados').textContent = '0';
+            document.getElementById('totalFaltas').textContent = '0';
+            document.getElementById('resetDailyConfig').click();
+            showNotification('Todos os dados foram removidos! Feriados padrão restaurados.', 'warning');
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            notificationText.textContent = message;
+            notification.className = 'notification';
+            notification.classList.add(type);
+            const icon = notification.querySelector('i');
+            if (type === 'error') icon.className = 'fas fa-exclamation-circle';
+            else if (type === 'warning') icon.className = 'fas fa-exclamation-triangle';
+            else icon.className = 'fas fa-check-circle';
+            notification.classList.add('show');
+            setTimeout(() => { notification.classList.remove('show'); }, 3000);
+        }
 
         document.addEventListener('DOMContentLoaded', initApp);
     </script>
