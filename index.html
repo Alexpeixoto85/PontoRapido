@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
+        /* ESTILOS EXISTENTES (MANTIDOS IGUAIS) */
         * {
             margin: 0;
             padding: 0;
@@ -2819,7 +2820,7 @@
             showNotification('Registros do mês limpos com sucesso!');
         }
         
-        // Exportar registro atual para Excel
+        // Exportar registro atual para Excel (versão melhorada com cabeçalho e resumo)
         function exportCurrentTimesheet() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
@@ -2839,9 +2840,26 @@
             const employee = employees.find(emp => emp.id === currentEmployeeId);
             const monthName = getMonthName(month);
             
+            // Buscar totais e contagens do DOM
+            const totalMonthHours = document.getElementById('totalMonthHours').textContent;
+            const totalMonthBalance = document.getElementById('totalMonthBalance').textContent;
+            const totalFolgas = document.getElementById('totalFolgas').textContent;
+            const totalFeriados = document.getElementById('totalFeriados').textContent;
+            const totalAtestados = document.getElementById('totalAtestados').textContent;
+            const totalFaltas = document.getElementById('totalFaltas').textContent;
+            
+            // Construir dados da planilha
             const data = [];
+            
+            // Cabeçalho com nome do funcionário (mesclado)
+            data.push([`Registro de Ponto - ${employee.name}`, ...Array(9).fill('')]);
+            data.push([`Mês/Ano: ${monthName}/${year}`, ...Array(9).fill('')]);
+            data.push([]); // linha em branco
+            
+            // Cabeçalho das colunas
             data.push(["Dia", "Entrada", "Saída (Intervalo)", "Volta (Intervalo)", "Saída", "Total", "Saldo", "Tipo", "Motivo", "Horas Atestado"]);
             
+            // Dias do mês
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
             for (let day = 1; day <= daysInMonth; day++) {
@@ -2876,21 +2894,48 @@
                 ]);
             }
             
+            // Linha em branco
+            data.push([]);
+            
+            // Resumo
+            data.push(["Total Horas Normais:", "", "", "", "", totalMonthHours, "", "", "", ""]);
+            data.push(["Saldo do Mês:", "", "", "", "", totalMonthBalance, "", "", "", ""]);
+            data.push(["Folgas:", totalFolgas, "Feriados:", totalFeriados, "Atestados:", totalAtestados, "Faltas:", totalFaltas, "", ""]);
+            
+            // Criar planilha
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(data);
             
+            // Definir larguras das colunas
             const wscols = [
-                {wch: 5}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 20}, {wch: 12}
+                {wch: 6},   // Dia
+                {wch: 10},  // Entrada
+                {wch: 15},  // Saída (Intervalo)
+                {wch: 15},  // Volta (Intervalo)
+                {wch: 10},  // Saída
+                {wch: 10},  // Total
+                {wch: 10},  // Saldo
+                {wch: 12},  // Tipo
+                {wch: 20},  // Motivo
+                {wch: 12}   // Horas Atestado
             ];
             ws['!cols'] = wscols;
             
-            XLSX.utils.book_append_sheet(wb, ws, "Plan1");
+            // Mesclar células do cabeçalho (primeiras duas linhas, colunas A a J)
+            if (!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }); // Linha 0, colunas 0-9
+            ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }); // Linha 1, colunas 0-9
             
+            // Adicionar à pasta de trabalho
+            XLSX.utils.book_append_sheet(wb, ws, "Ponto Mensal");
+            
+            // Nome do arquivo
             const fileName = `Ponto_${employee.name.replace(/\s+/g, '_')}_${monthName}_${year}.xlsx`;
             
+            // Salvar
             XLSX.writeFile(wb, fileName);
             
-            showNotification('Arquivo Excel exportado no formato correto!');
+            showNotification('Arquivo Excel exportado com layout moderno!');
         }
         
         // Exportar registro atual para PDF
