@@ -1800,6 +1800,10 @@
                 const city = document.getElementById('citySelect').value;
                 loadCityHolidays(city);
             });
+
+            // NOVO: Atualização automática da jornada diária ao alterar horário padrão
+            document.getElementById('workdayStart').addEventListener('change', applyWorkdayToDaily);
+            document.getElementById('workdayEnd').addEventListener('change', applyWorkdayToDaily);
         }
 
         // --- Funções principais do calendário ---
@@ -1916,7 +1920,7 @@
                 });
             });
 
-            // Auto-save apenas no campo "saida"
+            // Auto-save apenas no campo "saida" e auto-avanço em todos os campos de horário
             document.querySelectorAll('.time-input').forEach(input => {
                 input.addEventListener('change', function() {
                     const row = this.closest('tr');
@@ -1931,6 +1935,20 @@
                                 saveTimesheet();
                                 showNotification('Último dia do mês preenchido. Registros salvos automaticamente!');
                             }, 1000);
+                        }
+                    }
+                });
+
+                // NOVO: Auto-avanço ao completar 5 caracteres (formato HH:MM)
+                input.addEventListener('input', function(e) {
+                    const val = this.value;
+                    if (val.length === 5 && /^[0-9]{2}:[0-9]{2}$/.test(val)) {
+                        // Encontra o próximo campo de hora na mesma linha
+                        const row = this.closest('tr');
+                        const timeInputs = row.querySelectorAll('.time-input:enabled');
+                        const currentIndex = Array.from(timeInputs).indexOf(this);
+                        if (currentIndex !== -1 && currentIndex < timeInputs.length - 1) {
+                            timeInputs[currentIndex + 1].focus();
                         }
                     }
                 });
