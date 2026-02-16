@@ -1810,13 +1810,17 @@
         // --- Funções principais do calendário ---
         async function generateCalendar() {
             if (!currentEmployeeId) return;
+            const employee = employees.find(emp => emp.id === currentEmployeeId);
+            if (!employee) {
+                showNotification('Funcionário não encontrado!', 'error');
+                return;
+            }
             const month = parseInt(document.getElementById('monthSelect').value);
             const year = parseInt(document.getElementById('yearSelect').value);
             const today = new Date();
             const timesheetKey = `${currentEmployeeId}-${year}-${month}`;
             const savedTimesheet = await getTimesheet(timesheetKey);
             const savedData = savedTimesheet || {};
-            const employee = employees.find(emp => emp.id === currentEmployeeId);
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const timesheetBody = document.getElementById('timesheetBody');
             timesheetBody.innerHTML = '';
@@ -2347,6 +2351,8 @@
             if (firstActiveEmployee && !currentEmployeeId) {
                 currentEmployeeId = firstActiveEmployee.id;
                 employeeSelect.value = currentEmployeeId;
+                // Gera o calendário automaticamente após definir o funcionário inicial
+                generateCalendar();
             }
         }
 
