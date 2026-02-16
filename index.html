@@ -1555,7 +1555,8 @@
             });
         }
 
-        async function saveTimesheet(key, daysData) {
+        // Renomeada para evitar conflito com a função de mesmo nome que lê da tela
+        async function dbSaveTimesheet(key, daysData) {
             return put(STORES.TIMESHEETS, { key, ...daysData });
         }
 
@@ -1778,7 +1779,7 @@
             document.getElementById('exportCurrentPDF').addEventListener('click', exportCurrentTimesheetPDF);
             document.getElementById('autoFill').addEventListener('click', autoFillTimesheet);
             document.getElementById('autoUpdate').addEventListener('click', autoUpdateBalances);
-            document.getElementById('saveMonth').addEventListener('click', saveTimesheet);
+            document.getElementById('saveMonth').addEventListener('click', saveTimesheetFromDOM);
             document.getElementById('clearMonth').addEventListener('click', clearTimesheet);
             document.getElementById('exportCurrent').addEventListener('click', exportCurrentTimesheet);
             document.getElementById('employeeForm').addEventListener('submit', handleEmployeeForm);
@@ -1932,7 +1933,7 @@
                         const day = parseInt(row.querySelector('.entrada').getAttribute('data-day'));
                         if (day === daysInMonth) {
                             setTimeout(() => {
-                                saveTimesheet();
+                                saveTimesheetFromDOM();
                                 showNotification('Último dia do mês preenchido. Registros salvos automaticamente!');
                             }, 1000);
                         }
@@ -2157,12 +2158,12 @@
         function triggerAutoSave() {
             if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
             autoSaveTimeout = setTimeout(() => {
-                if (currentEmployeeId) saveTimesheet();
+                if (currentEmployeeId) saveTimesheetFromDOM();
             }, AUTO_SAVE_DELAY);
         }
 
-        // --- Funções de salvamento e manipulação de dados (corrigidas) ---
-        async function saveTimesheet() {
+        // --- Função que lê os dados da tela e salva no banco ---
+        async function saveTimesheetFromDOM() {
             if (!currentEmployeeId) {
                 showNotification('Selecione um funcionário primeiro!', 'error');
                 return;
@@ -2198,7 +2199,7 @@
             });
             
             try {
-                await saveTimesheet(timesheetKey, daysData);
+                await dbSaveTimesheet(timesheetKey, daysData);
                 timesheets[timesheetKey] = daysData;
                 showNotification('Registros do mês salvos com sucesso!');
             } catch (error) {
@@ -2304,7 +2305,7 @@
             calculateMonthTotal();
             if (updatedCount > 0) {
                 showNotification(`Saldos atualizados automaticamente para ${updatedCount} dias sem registro!`);
-                saveTimesheet();
+                saveTimesheetFromDOM();
             } else {
                 showNotification('Nenhum dia sem registro encontrado para atualização.', 'info');
             }
@@ -3058,7 +3059,7 @@
                             }
                         }
                         timesheets[timesheetKey] = daysData;
-                        await saveTimesheet(timesheetKey, daysData);
+                        await dbSaveTimesheet(timesheetKey, daysData);
                         showNotification(`Dados importados com sucesso para ${getMonthName(month)}/${year}!`);
                         fileInput.value = '';
                         if (employeeId === currentEmployeeId && month === parseInt(document.getElementById('monthSelect').value) && year === parseInt(document.getElementById('yearSelect').value)) {
@@ -3130,7 +3131,7 @@
                             for (const [key, backupDays] of Object.entries(backupData.timesheets)) {
                                 if (!timesheets[key]) {
                                     timesheets[key] = backupDays;
-                                    await saveTimesheet(key, backupDays);
+                                    await dbSaveTimesheet(key, backupDays);
                                     addedTimesheets++;
                                 } else {
                                     const existingDays = timesheets[key];
@@ -3151,7 +3152,7 @@
                                     }
                                     if (daysAdded>0 || daysUpdated>0) {
                                         updatedTimesheets++;
-                                        await saveTimesheet(key, existingDays);
+                                        await dbSaveTimesheet(key, existingDays);
                                     }
                                 }
                             }
